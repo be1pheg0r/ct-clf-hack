@@ -1,0 +1,27 @@
+[project]
+name = "ct-clf-hack"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "be1pheg0r",email = "147649274+be1pheg0r@users.noreply.github.com"}
+]
+includes =[ "ct_clf_hack"]
+
+[tool.poetry.dependencies]
+python = ">=3.9, <3.13"
+dotenv = "*"
+pytest = "^8.4.1"
+pathlib = "^1.0.1"
+numpy = ">=2.0.0"
+opencv-python-headless = "^4.7.0.72"
+jupyter = "^1.1.1"
+
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: mark a test as a unit test"
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
