@@ -15,7 +15,12 @@ pathlib = "^1.0.1"
 numpy = ">=2.0.0"
 opencv-python-headless = "^4.7.0.72"
 jupyter = "^1.1.1"
-
+pydicom = "*"
+matplotlib = "*"
+ipympl = "*"
+pandas = "*"
+seaborn = "*"
+scikit-learn = "*"
 
 [tool.pytest.ini_options]
 markers = [
