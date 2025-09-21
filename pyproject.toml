@@ -21,6 +21,10 @@ ipympl = "*"
 pandas = "*"
 seaborn = "*"
 scikit-learn = "*"
+torch = "^2.8.0"
+torchvision = "^0.23.0"
+opencv-python = "^4.12.0.88"
+tqdm = "^4.67.1"
 
 [tool.pytest.ini_options]
 markers = [
