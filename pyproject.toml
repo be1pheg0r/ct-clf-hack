@@ -21,6 +21,11 @@ ipympl = "*"
 pandas = "*"
 seaborn = "*"
 scikit-learn = "*"
+notebook = "^7.4.5"
+nibabel = "*"
+tqdm = "*"
+torchvision="*"
+albumentations = "*"
 
 [tool.pytest.ini_options]
 markers = [
