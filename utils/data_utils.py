@@ -1,56 +1,11 @@
 from pathlib import Path
-from typing import List, Tuple, Optional
 import numpy as np
-import pydicom as dcm
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 from torch.utils.data.distributed import DistributedSampler
-from PIL import Image
-
-
-def read_dicom(file_path: Path, apply_rescale: bool = True) -> np.ndarray:
-    """
-    Читает один DICOM-файл и возвращает numpy-массив.
-    При необходимости применяет RescaleSlope/RescaleIntercept.
-
-    Args:
-        file_path (Path): путь к файлу .dcm
-        apply_rescale (bool): применять ли RescaleSlope/Intercept
-
-    Returns:
-        np.ndarray: изображение (H, W), float32
-    """
-    ds = dcm.dcmread(str(file_path))
-    img = ds.pixel_array.astype(np.float32)
-
-    if apply_rescale:
-        slope = float(getattr(ds, "RescaleSlope", 1.0))
-        intercept = float(getattr(ds, "RescaleIntercept", 0.0))
-        img = img * slope + intercept
-
-    return img
-
-
-def save_image(img: np.ndarray, file_path: Path):
-    """
-    Сохраняет numpy-массив как PNG/JPEG
-    Args:
-        img (np.ndarray): изображение [0,1] или [0,255]
-        file_path (Path): путь для сохранения
-    """
-    # если в [0,1], то переводим в [0,255]
-    if img.max() <= 1.0:
-        img = (img * 255).astype(np.uint8)
-    else:
-        img = img.astype(np.uint8)
-
-    # если изображение одноканальное - делаем "L"
-    if img.ndim == 2:
-        pil_img = Image.fromarray(img, mode="L")
-    else:
-        pil_img = Image.fromarray(img)
-
-    pil_img.save(str(file_path))
+from typing import List, Tuple, Optional, Union
+from .utils import iterate_dicom_nii_slices 
+# from torchvision.transforms import Compose, Resize, ToTensor, Normalize
 
 
 def normalize_to_unit(img: np.ndarray) -> np.ndarray:
@@ -112,41 +67,51 @@ class DicomDataset(Dataset):
     """
 
     def __init__(self,
-                 files: List[Path],
+                 files: List[np.ndarray], # список numpy массивов
                  labels: Optional[List[int]] = None,
                  transform: Optional[callable] = None,
                  normalize: bool = True,
                  gamma: Optional[float] = None,
                  auto_gamma: bool = False,
-                 rescale: bool = True,
                  to_rgb: bool = True):
         """
         Args:
-            files: список путей к DICOM
+            files: список numpy массивов изображений (H, W)
             labels: список меток (или None для инференса)
             transform: аугментации torchvision
             normalize: приводить к [0,1]
             gamma: применять фиксированную гамма-коррекцию
             auto_gamma: автоматически подбирать гамму
-            rescale: использовать RescaleSlope/Intercept
             to_rgb: конвертировать в RGB (для предобученных моделей)
         """
+        # Теперь DicomDataset ожидает уже загруженные и обработанные срезы (numpy массивы)
+        # Или использует iterate_dicom_nii_slices напрямую
+        # self.files - это список numpy массивов (H, W)
         self.files = files
         self.labels = labels
         self.transform = transform
         self.normalize = normalize
         self.gamma = gamma
         self.auto_gamma = auto_gamma
-        self.rescale = rescale
         self.to_rgb = to_rgb
+
 
     def __len__(self) -> int:
         return len(self.files)
 
     def __getitem__(self, idx: int):
-        # читаем DICOM
-        img = read_dicom(self.files[idx], apply_rescale=self.rescale)
+        # читаем изображение из списка numpy массивов
+        img = self.files[idx] 
 
+        # labels уже должны быть соответствующим образом загружены  или переданы отдельно в __init__
+        # или использовать iterate_dicom_nii_slices
+
+        if self.labels is not None:
+            label = self.labels[idx]
+        else:
+            label = -1 # или None, если метки неизвестны
+
+        # img - это numpy массив (H, W)
         # нормализация
         if self.normalize:
             img = normalize_to_unit(img)
@@ -167,29 +132,60 @@ class DicomDataset(Dataset):
             img = self.transform(img)
 
         if self.labels is not None:
-            return img, self.labels[idx]
+            return img, label
         return img
 
 
-def load_dicom_dataset(root: Path, class_names: List[str]) -> Tuple[List[Path], List[int]]:
+# Вспомогательная функция для создания датасета из директорий
+def create_dataset_from_dirs(
+    root_dirs: Union[Path, List[Path], str, List[str]],
+    class_map: Optional[dict] = None,
+    transform: Optional[callable] = None,
+    normalize: bool = True,
+    gamma: Optional[float] = None,
+    auto_gamma: bool = False,
+    to_rgb: bool = True,
+    show_progress: bool = False
+) -> DicomDataset:
     """
-    Сканирует директории и собирает список файлов и меток.
-    Каждая папка = отдельный класс.
+    Создает DicomDataset из списка директорий, используя iterate_dicom_nii_slices.
 
     Args:
-        root (Path): корневая папка (../data/uncompressed)
-        class_names (List[str]): имена папок (например ["norma_anon", "pneumonia_anon", "pneumotorax_anon"])
+        root_dirs: одна или несколько директорий для поиска файлов.
+        class_map: словарь соответствия имени папки классу.
+        transform: аугментации torchvision.
+        normalize: приводить ли к [0,1].
+        gamma: применять фиксированную гамма-коррекцию.
+        auto_gamma: автоматически подбирать гамму.
+        to_rgb: конвертировать в RGB.
+        show_progress: показывать прогресс-бар при загрузке.
 
     Returns:
-        (files, labels): список файлов и меток
+        DicomDataset: готовый к использованию датасет.
     """
-    files, labels = [], []
-    for label, cls in enumerate(class_names):
-        cls_path = root / cls
-        dicoms = list(cls_path.glob("*.dcm"))
-        files.extend(dicoms)
-        labels.extend([label] * len(dicoms))
-    return files, labels
+    images = []
+    labels = []
+    # Используем iterate_dicom_nii_slices для загрузки
+    for img_slice, label, file_path in iterate_dicom_nii_slices(
+        base_dirs=root_dirs,
+        class_map=class_map,
+        recursive=True,
+        show_progress=show_progress
+    ):
+        images.append(img_slice)
+        labels.append(label)
+
+    # Создаем датасет
+    dataset = DicomDataset(
+        files=images, # Передаем список numpy массивов
+        labels=labels,
+        transform=transform,
+        normalize=normalize,
+        gamma=gamma,
+        auto_gamma=auto_gamma,
+        to_rgb=to_rgb
+    )
+    return dataset
 
 
 def create_dataloader(dataset: Dataset,
