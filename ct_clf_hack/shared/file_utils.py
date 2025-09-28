@@ -1,11 +1,18 @@
 from pathlib import Path
+from typing import Iterator, List, Optional, Tuple, Union
+
+import nibabel as nib
 import numpy as np
 import pydicom as dcm
-import nibabel as nib
+import yaml
 from PIL import Image
-from typing import List, Tuple, Optional, Union, Iterator
 from tqdm import tqdm
 
+
+def read_yaml(file_path: Path) -> dict:
+    with open(file_path, 'r') as f:
+        data = yaml.safe_load(f)
+    return data
 
 def read_dicom(file_path: Path, apply_rescale: bool = True) -> np.ndarray:
     ds = dcm.dcmread(str(file_path))

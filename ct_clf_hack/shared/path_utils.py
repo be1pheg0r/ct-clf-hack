@@ -16,3 +16,9 @@ def checkpoints_dpath() -> Path:
 
 def configs_dpath() -> Path:
     return root_dpath() / "configs"
+
+def backend_dpath() -> Path:
+    return root_dpath() / "ct_clf_backend"
+
+def backend_configs_dpath() -> Path:
+    return backend_dpath() / "configs"

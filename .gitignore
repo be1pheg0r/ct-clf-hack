@@ -3,6 +3,13 @@
 /poetry.lock
 checkpoints/
 
+ct_clf_backend/configs/db_cfg.yaml
+
+*.db
+*.sqlite3
+*.pth
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
