@@ -9,6 +9,7 @@ class KMeansTorch:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.centroids = None
 
+    # TODO: переписать в атрибут класса, опц. сохранение/загрузка
     def _gather_from_loader(self, loader):
         """Собираем все данные из DataLoader в один тензор"""
         all_batches = []

@@ -10,6 +10,10 @@ from typing import Union, List, Tuple, Optional, Dict, Any
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+# TODO: у KNN нет весов и обучающих данных, там просто хранится весь датасет
+# TODO: напиши скрипт для компиляции всего нужного входа в один файл
+# TODO: или просто возьми класс из склерн
 class KNNPyTorchClassifier:
     """
     Args:

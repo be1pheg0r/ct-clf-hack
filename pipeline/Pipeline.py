@@ -7,6 +7,7 @@ from KNN import KNNPyTorchClassifier
 from KMeans import KMeansTorch
 
 
+# TODO: фиксацию сида вынести в те функции, где это нужно
 SEED = 42
 random.seed(SEED)
 np.random.seed(SEED)

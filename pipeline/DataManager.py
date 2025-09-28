@@ -9,6 +9,7 @@ import pydicom as dicom
 
 
 
+# TODO: дублирование кода с ct_clf_hack/shared/data_utils.py, можешь наследовать из или переписать data_utils.py
 class DicomDataset(Dataset):
     """
     Dataset для DICOM-файлов.
