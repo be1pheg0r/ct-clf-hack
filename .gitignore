@@ -1,6 +1,7 @@
 /data
 /checkpoints
 /poetry.lock
+checkpoints/
 
 
 # Byte-compiled / optimized / DLL files
