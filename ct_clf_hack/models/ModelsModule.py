@@ -57,6 +57,10 @@ class ModelCNN(nn.Module):
             optim.lr_scheduler.StepLR(self.optimizers[i], step_size=5, gamma=0.1) for i in range(n_models)
         ]
 
+    def check_model_index(self, n: int):
+        if n >= self.n_models:
+            raise ValueError('There is no n-th model.')
+
     def change_first_layer(self, model):
         model.conv1 = nn.Conv2d(1, model.conv1.out_channels,
                                 kernel_size=model.conv1.kernel_size,
@@ -79,6 +83,8 @@ class ModelCNN(nn.Module):
         return model.to(self.device)
 
     def forward(self, x, n: int = 0):
+        self.check_model_index(n)
+
         return self.models[n](x)
 
     def load_data_to_dataloader(self, images: list[ndarray], labels: list[int], batch_size: int = 32):
@@ -86,6 +92,8 @@ class ModelCNN(nn.Module):
         return DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     def train_model(self, dataloader, n: int = 0, epochs: int = 10):
+        self.check_model_index(n)
+
         model = self.models[n]
         optimizer = self.optimizers[n]
         scheduler = self.schedulers[n]
@@ -134,6 +142,8 @@ class ModelCNN(nn.Module):
             save_path = Path(dpath) / f"resnet50_model{i}.pth" if dpath else Path(f"resnet50_model{i}.pth")
             torch.save(state, save_path)
             print(f"Model {i} saved to {save_path}")
+        
+        self.check_model_index(n)
 
         if all:
             for i in range(self.n_models):
@@ -145,6 +155,8 @@ class ModelCNN(nn.Module):
 
 
     def load(self, model_path: str, n: int = 0):
+        self.check_model_index(n)
+
         model = self.models[n]
         model_path = Path(model_path)
         if not model_path.exists():
@@ -165,6 +177,8 @@ class ModelCNN(nn.Module):
         print(f"Model {n} loaded from {model_path}")
 
     def predict(self, images: list[ndarray], batch_size: int = 32, n: int = 0) -> list[int]:
+        self.check_model_index(n)
+        
         dataset = CTDataset(images, transform=self.transforms)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
