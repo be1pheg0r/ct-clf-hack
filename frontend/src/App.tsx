@@ -1,13 +1,14 @@
+// src/App.tsx
 import React, { useState } from "react";
 import Chat from "./components/chat";
 import FileUpload from "./components/FileUpload";
 import "./styles.css";
-import { ResultData } from "./types";
+import { ResultData, ViewerData } from "./types";
 
 export interface Message {
   id: number;
-  type: "user" | "system" | "result";
-  content: string | ResultData;
+  type: "user" | "system" | "result" | "viewer";
+  content: string | ResultData | ViewerData;
 }
 
 const App: React.FC = () => {
@@ -29,7 +30,7 @@ const App: React.FC = () => {
       return;
     }
 
-    // добавляем сообщение-пользователя и skeleton-статус
+    // Добавляем сообщение-пользователя и skeleton-статус
     const uploadingMsgId = genId();
     setMessages((prev) => [
       ...prev,
@@ -46,9 +47,14 @@ const App: React.FC = () => {
         body: formData,
       });
 
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Server returned ${res.status}: ${text}`);
+      }
+
       const data = await res.json();
 
-      // пытаемся привести probability/pathology к числам
+      // Нормализуем поля результата
       const normalized: ResultData = {
         path_to_study: data.path_to_study,
         study_uid: data.study_uid,
@@ -63,16 +69,39 @@ const App: React.FC = () => {
         time_of_processing: data.time_of_processing,
       };
 
-      // удаляем skeleton-статус и добавляем result-карту
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== uploadingMsgId),
+      // Проверяем frames (массив data:image/png;base64,...)
+      const viewer =
+        data.frames && Array.isArray(data.frames) && data.frames.length > 0
+          ? ({ frames: data.frames as string[] } as ViewerData)
+          : null;
+
+      // Собираем массив сообщений, который будем добавить — явно аннотируем как Message[]
+      const toAdd: Message[] = [
         { id: genId(), type: "result", content: normalized },
-      ]);
-    } catch (error) {
+      ];
+      if (viewer) {
+        toAdd.push({ id: genId(), type: "viewer", content: viewer });
+      }
+
+      // Удаляем skeleton-статус и добавляем result + viewer (если есть)
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== uploadingMsgId),
-        { id: genId(), type: "system", content: "❌ Ошибка при обработке файла" },
+        ...toAdd,
       ]);
+    } catch (error: any) {
+      // удаляем skeleton и показываем ошибку
+      setMessages((prev) => [
+        ...prev.filter((m) => m.id !== uploadingMsgId),
+        {
+          id: genId(),
+          type: "system",
+          content:
+            error && error.message
+              ? `❌ Ошибка при обработке файла: ${error.message}`
+              : "❌ Ошибка при обработке файла",
+        },
+      ]);
+      console.error("Upload error:", error);
     }
   };
 

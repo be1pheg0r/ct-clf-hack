@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-
+from typing import List, Optional
 
 class InputData(BaseModel):
     query_id: str = Field(..., description="Unique identifier for the query.")
@@ -15,3 +15,4 @@ class OutputData(BaseModel):
     pathology: int = Field(..., description="Indicates if pathology is present (0 for no pathology, 1 for pathology).")
     processing_status: str = Field(..., description="Processing status (Success/Failure).")
     time_of_processing: float = Field(..., description="Time taken for processing (in seconds).")
+    slices: Optional[List[str]] = None

@@ -1,7 +1,8 @@
 import React from "react";
 import { Message } from "../App";
 import ResultCard from "./ResultCard";
-import { ResultData } from "../types";
+import DicomViewer from "./DicomViewer";
+import { ViewerData } from "../types";
 
 interface MessageProps {
   message: Message;
@@ -13,14 +14,25 @@ const MessageBubble: React.FC<MessageProps> = ({ message }) => {
       <div className="message-row system-row">
         <div style={{ width: 12 }} />
         <div className="bubble bubble-system" style={{ padding: 10 }}>
-          <ResultCard data={message.content as ResultData} />
+          <ResultCard data={message.content as any} />
+        </div>
+      </div>
+    );
+  }
+
+  if (message.type === "viewer") {
+    return (
+      <div className="message-row system-row">
+        <div style={{ width: 12 }} />
+        <div className="bubble bubble-system" style={{ padding: 10 }}>
+          <DicomViewer data={message.content as ViewerData} />
         </div>
       </div>
     );
   }
 
   const isUser = message.type === "user";
-  const text = message.content as string; // ✅ гарантируем строку
+  const text = message.content as string;
 
   return (
     <div className={`message-row ${isUser ? "user-row" : "system-row"}`}>
