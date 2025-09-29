@@ -20,25 +20,6 @@ from typing import Optional
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
-class CTDataset(Dataset):
-    def __init__(self, images, labels=None, transform=None):
-        self.images = images
-        self.labels = labels
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, idx):
-        image = self.images[idx]
-        if self.transform:
-            image = self.transform(image)
-        if self.labels is not None:
-            label = self.labels[idx]
-            return image, label
-        return image
-
-
 class ModelCNN:
     __INPUT_SIZE = {
         "ResNet50": (224, 224),
@@ -129,10 +110,8 @@ class ModelCNN:
         self.model = self.model.to(self.device)
         self.criterion.to(self.device)
 
-    def load_data(self, images: list[ndarray], labels: list[int]):
-        dataset = CTDataset(images, labels, transform=self.transforms)
-        self.dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-        return dataset
+    def load_data(self, loader: DataLoader):
+        self.dataloader = loader
 
     def train(self, epochs: int = 10):
         use_amp = self.device == "cuda"
@@ -147,7 +126,8 @@ class ModelCNN:
             loop = tqdm(self.dataloader, desc=f"Epoch {epoch + 1}/{epochs}")
             for images, labels in loop:
                 images, labels = images.to(self.device).float(), labels.to(self.device)
-
+                if images.ndim == 3:
+                    images = images.unsqueeze(1)
                 self.optimizer.zero_grad()
 
                 if use_amp:
@@ -181,14 +161,11 @@ class ModelCNN:
 
             print(f"Epoch {epoch + 1}/{epochs} | Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc:.4f}")
 
-    def save(self, dpath: Optional[str] = None):
+    def save(self, dpath: str):
+        """Save model to specified path"""
         model_state = self.model.module.state_dict() if isinstance(self.model,
                                                                    nn.DataParallel) else self.model.state_dict()
-        if dpath:
-            save_path = str(Path(dpath) / f'trained_{self.model_name}.pth')
-        else:
-            save_path = f'trained_{self.model_name}.pth'
-        model_save(model_state, save_path)
+        model_save(model_state, dpath)
 
     def load(self, model_path: str):
         model_path = Path(model_path)
@@ -228,14 +205,14 @@ class ModelCNN:
         self.model.eval()
         print(f"Model loaded from {model_path}")
 
-    def predict(self, images: list[ndarray], batch_size: int = 32) -> list[int]:
-        dataset = CTDataset(images, transform=self.transforms)
+    def predict(self, dataset: Dataset, batch_size: int = 32) -> list[int]:
+        """Predict using dataset"""
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
         self.model.eval()
         all_preds = []
         with torch.no_grad():
-            for batch in tqdm(dataloader, desc="Predicting"):
+            for batch, _ in tqdm(dataloader, desc="Predicting"):
                 batch = batch.to(self.device).float()
                 outputs = self.model(batch)
                 if self.model_name == "Inception_V3" and self.model.training:
@@ -243,3 +220,4 @@ class ModelCNN:
                 preds = torch.argmax(outputs, dim=1).cpu().numpy()
                 all_preds.extend(preds)
         return all_preds
+

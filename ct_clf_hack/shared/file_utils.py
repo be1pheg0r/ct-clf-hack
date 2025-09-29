@@ -1,11 +1,18 @@
 from pathlib import Path
+from typing import Iterator, List, Optional, Tuple, Union
+
+import nibabel as nib
 import numpy as np
 import pydicom as dcm
-import nibabel as nib
+import yaml
 from PIL import Image
-from typing import List, Tuple, Optional, Union, Iterator
 from tqdm import tqdm
 
+
+def read_yaml(file_path: Path) -> dict:
+    with open(file_path, 'r') as f:
+        data = yaml.safe_load(f)
+    return data
 
 def read_dicom(file_path: Path, apply_rescale: bool = True) -> np.ndarray:
     ds = dcm.dcmread(str(file_path))
@@ -46,16 +53,6 @@ def iterate_dicom_nii_slices(
         verbose: bool = False,
         subset: Optional[int] = None
 ) -> Iterator[Tuple[np.ndarray, int, Path]]:
-    if class_map is None:
-        class_map = {
-            'norma_anon': 0,
-            'pneumonia_anon': 1,
-            'pneumotorax_anon': 2,
-            'CT-0': 0,
-            'CT-1': 3,
-            'CT-2': 3,
-            'CT-3': 3,
-        }
 
     if subset is not None and subset <= 0:
         return
@@ -74,10 +71,10 @@ def iterate_dicom_nii_slices(
                 print(f"Warning: {folder_path} does not exist, skipping.")
                 continue
 
-            glob_pattern = "**/*.dcm" if recursive else "*.dcm"
-            dicom_files = list(folder_path.glob(glob_pattern))
+            glob_pattern = "**/*" if recursive else "*"
+            dicom_files = [p for p in folder_path.glob(glob_pattern) if p.is_file() and p.suffix.lower() in ['.dcm', '.dicom', '']]
             glob_pattern = "**/*.nii" if recursive else "*.nii"
-            nii_files = list(folder_path.glob(glob_pattern))
+            nii_files = [p for p in folder_path.glob(glob_pattern) if p.is_file()]
 
             all_file_paths.extend(
                 [(p, label, "dcm") for p in dicom_files if p.is_file()]
@@ -85,7 +82,6 @@ def iterate_dicom_nii_slices(
             all_file_paths.extend(
                 [(p, label, "nii") for p in nii_files if p.is_file()]
             )
-
     count = 0
     iterator = tqdm(all_file_paths, desc="Loading slices", disable=not verbose)
 
@@ -123,5 +119,5 @@ def iterate_dicom_nii_slices(
                     count += 1
 
         except Exception as e:
-            print(f"Error processing file {file_path}: {e}")
+            print(f"Error processing file {file_path}, ext: {ext}: {e}")
             continue
