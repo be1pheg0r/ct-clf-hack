@@ -6,13 +6,15 @@ from sklearn.cluster import KMeans
 import joblib
 
 
-class ModelKNN:
-    def __init__(self, data: Optional[Union[np.ndarray, torch.Tensor]] = None, n_clusters: int = 8) -> None:
-        self.n_clusters = n_clusters
-        self.model = KMeans(n_clusters=self.n_clusters)
+class KNNSeparator:
+    def __init__(self, data: Optional[Union[np.ndarray, torch.Tensor]] = None, k: int = 8) -> None:
+        self.k = k
+        self.model = KMeans(n_clusters=self.k)
         if data is not None:
-            data_np = data.cpu().numpy() if isinstance(data, torch.Tensor) else data
-            self.model.fit(data_np)
+            self.load_data(data)
+
+    def load_data(self, data: Union[np.ndarray, torch.Tensor]) -> None:
+        self.fit(data)
 
     def fit(self, data: Union[np.ndarray, torch.Tensor]) -> None:
         if isinstance(data, torch.Tensor):
@@ -32,7 +34,7 @@ class ModelKNN:
     def save_model(self, path: str) -> None:
         joblib.dump(self.model, path)
 
-    def load_model(self, path: str, inplace: bool = True) -> Optional['ModelKNN']:
+    def load_model(self, path: str, inplace: bool = True) -> Optional['KNNSeparator']:
         loaded_model = joblib.load(path)
         self.model = loaded_model
         return self if inplace else None
@@ -52,5 +54,4 @@ class ModelKNN:
         best_k = k_values[np.argmin(np.diff(sse, 2)) + 1] if len(sse) > 2 else 1
         results_df = pd.DataFrame({'k': k_values, 'sse': sse})
         return best_k, results_df
-
 

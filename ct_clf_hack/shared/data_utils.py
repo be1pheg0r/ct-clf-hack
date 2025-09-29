@@ -6,8 +6,29 @@ import torchvision.transforms as T
 import albumentations as A
 from torch.utils.data.distributed import DistributedSampler
 from typing import Tuple, Optional, Union
-from ct_clf_hack.shared.file_utils import iterate_dicom_nii_slices
+from ct_clf_hack.shared.file_utils import iterate_dicom_nii_slices, read_yaml
+from ct_clf_hack.shared.path_utils import configs_dpath
 
+import warnings
+
+def load_class_map():
+    config_path = configs_dpath() / 'class_map.yaml'
+    try:
+        class_map = read_yaml(config_path)
+        return class_map
+    except Exception as e:
+        warnings.warn(f"Error reading class_map.yaml: {e}")
+        warnings.warn(f"It's possible to create {config_path} with the following content:\n"
+                      "label0: 0\n"
+                      "label1: 1\n"
+                      "...\n"
+                      "labelN: N\n")
+        return {
+            'norma_anon': 0,
+            'pneumonia_anon': 1,
+            'pneumotorax_anon': 2,
+        }
+class_map = load_class_map()
 
 class MainDataset(Dataset):
 
@@ -19,7 +40,8 @@ class MainDataset(Dataset):
                  transform: Optional[Union[A.Compose, T.Compose, callable]] = None,
                  verbose: bool = True,
                  device: Optional[torch.device] = None,
-                 dtype: torch.dtype = torch.float32
+                 dtype: torch.dtype = torch.float32,
+                 subset: Optional[int] = None
                  ) -> None:
         self.images = None
         self.labels = None
@@ -40,10 +62,15 @@ class MainDataset(Dataset):
                     base_dirs=dpaths,
                     class_map=class_map,
                     recursive=True,
-                    verbose=self._verbose
+                    verbose=self._verbose,
+                    subset=subset
             ):
                 self.images.append(img)
                 self.labels.append(label)
+            max_shape = max(img.shape for img in self.images)
+            self.images = [np.pad(img, [(0, max_shape[0] - img.shape[0]),
+                                        (0, max_shape[1] - img.shape[1])], mode='constant') if img.shape != max_shape else img
+                            for img in self.images]
             np_dtype = np.float32 if dtype == torch.float32 else np.float16
             self.images = torch.tensor(np.array(self.images, dtype=np_dtype), dtype=dtype)
             self.labels = torch.tensor(np.array(self.labels))
@@ -86,9 +113,7 @@ class MainDataset(Dataset):
                 img = self.transform(image=img.numpy())['image']
                 img = torch.tensor(img, dtype=torch.float32)
             elif isinstance(self.transform, T.Compose) or callable(self.transform):
-                img = img.unsqueeze(0) if img.ndim == 2 else img
-                img = self.transform(img)
-
+                img = self.transform(img) if img.ndim == 3 else self.transform(img.unsqueeze(0)).squeeze(0)
         return img, label
 
 
@@ -106,7 +131,7 @@ def create_dataloader(dataset: Dataset,
         batch_size=batch_size,
         shuffle=(sampler is None and shuffle),
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=(device == torch.device('cuda')),
         sampler=sampler
     )
     return loader
