@@ -1,27 +1,60 @@
-"""
-Скрипт для обучения и оценки различных архитектур CNN на изображениях КТ.
-"""
-
 import argparse
-from pathlib import Path
-import yaml
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import torch
-from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
-from sklearn.model_selection import train_test_split
+import yaml
+from sklearn.metrics import (accuracy_score, confusion_matrix, f1_score,
+                             precision_score, recall_score)
 
 from ct_clf_hack.models.ModelCNN import ModelCNN
-from ct_clf_hack.shared.data_utils import load_images_from_folders
-from ct_clf_hack.shared.config_utils import class_map_config
+from ct_clf_hack.shared.data_utils import (class_map, MainDataset, create_dataloader,
+                                           split_dataset)
+
+
+def evaluate_model(model, test_dataset, num_classes):
+    model.model.eval()
+    all_preds = []
+    all_labels = []
+
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+    with torch.no_grad():
+        for batch, labels in test_loader:
+            batch = batch.to(model.device).float()
+            outputs = model.model(batch)
+            preds = torch.argmax(outputs, dim=1).cpu().numpy()
+            all_preds.extend(preds)
+            all_labels.extend(labels.cpu().numpy())
+
+    accuracy = accuracy_score(all_labels, all_preds)
+    precision = precision_score(all_labels, all_preds, average='weighted', zero_division=0)
+    recall = recall_score(all_labels, all_preds, average='weighted', zero_division=0)
+    f1 = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
+
+    result = {
+        'Accuracy': accuracy,
+        'Precision': precision,
+        'Recall': recall,
+        'F1_Score': f1
+    }
+
+    if num_classes == 2:
+        cm = confusion_matrix(all_labels, all_preds)
+        if cm.size == 4:
+            tn, fp, fn, tp = cm.ravel()
+            result.update({
+                'TP': tp,
+                'FP': fp,
+                'FN': fn,
+                'TN': tn
+            })
+
+    return result, all_preds
 
 
 def main():
-    """
-    Скрипт для обучения и оценки различных архитектур CNN на изображениях КТ.
-    ПРИМ.: class_map.yaml должен быть настроен заранее. (configs/class_map.yaml)
-    """
     parser = argparse.ArgumentParser(description="Train and evaluate CNN models on CT scan images.")
     parser.add_argument("--data_dirs", type=str, nargs='+', required=True, help="Path(s) to the dataset directory containing class subdirectories.")
     parser.add_argument("--rs", type=int, default=52, help="Random seed")
@@ -36,15 +69,17 @@ def main():
     checkpoints_dir = Path(args.checkpoints_dir)
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
-    class_map = class_map_config()
+    dataset = MainDataset(dpaths=data_dirs, class_map=class_map, verbose=True)
 
-    images, labels = load_images_from_folders(data_dirs, class_map)
-    print(f"Total images loaded: {len(images)}")
-    print(f"Class 1: {labels.count(1)}, Class 0: {labels.count(0)}")
+    labels = [dataset.labels[i].item() for i in range(len(dataset))]
+    print(f"Total images loaded: {len(dataset)}")
+    print(f"Class distribution: {pd.Series(labels).value_counts().to_dict()}")
 
-    train_images, test_images, train_labels, test_labels = train_test_split(
-        images, labels, test_size=0.2, random_state=args.rs, stratify=labels, shuffle=True
-    )
+    train_dataset, test_dataset = split_dataset(dataset, val_ratio=0.2)
+    print(f"Train/Test split: {len(train_dataset)}/{len(test_dataset)}")
+
+    train_loader = create_dataloader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    test_loader = create_dataloader(test_dataset, batch_size=args.batch_size, shuffle=False)
     num_classes = len(set(labels))
 
     architectures = ["Inception_V3", "ResNet50", "DenseNet121", "ConvNeXt_Tiny"]
@@ -57,43 +92,21 @@ def main():
             print(f"Using model architecture: {model.model_name}")
             print(f"Number of classes: {model.num_classes}")
             print(f"Using device: {model.device}")
-            print(f"Train: {len(train_images)}, Test: {len(test_images)}")
+            print(f"Train: {len(train_dataset)}, Test: {len(test_dataset)}")
 
-            model.load_data(train_images, train_labels)
-            model.dataloader = torch.utils.data.DataLoader(
-                model.dataloader.dataset, batch_size=args.batch_size, shuffle=True
-            )
+            model.load_data(train_loader)
             model.train(epochs=args.epochs)
 
-            save_path = checkpoints_dir / f"{arch}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pth"
-            model.save(str(save_path))
+            dt_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            checkpoint_path = checkpoints_dir / f"{arch}_{dt_str}.pth"
+            model.save(str(checkpoint_path))
+            print(f"Checkpoint saved to {checkpoint_path}")
 
-            test_preds = model.predict(test_images, batch_size=args.batch_size)
+            result, all_preds = evaluate_model(model, test_dataset, num_classes)
+            result['Architecture'] = arch
+            results.append(result)
 
-            accuracy = accuracy_score(test_labels, test_preds)
-            precision = precision_score(test_labels, test_preds, average='weighted', zero_division=0)
-            recall = recall_score(test_labels, test_preds, average='weighted', zero_division=0)
-            f1 = f1_score(test_labels, test_preds, average='weighted', zero_division=0)
-            results.append({
-                'Architecture': arch,
-                'Accuracy': accuracy,
-                'Precision': precision,
-                'Recall': recall,
-                'F1_Score': f1
-            })
-
-            if num_classes == 2:
-                cm = confusion_matrix(test_labels, test_preds)
-                if cm.size == 4:
-                    tn, fp, fn, tp = cm.ravel()
-                    results[-1].update({
-                        'TP': tp,
-                        'FP': fp,
-                        'FN': fn,
-                        'TN': tn
-                    })
-
-            print(f"{arch} - Accuracy: {accuracy:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
+            print(f"{arch} - Accuracy: {result['Accuracy']:.4f}, Precision: {result['Precision']:.4f}, Recall: {result['Recall']:.4f}, F1: {result['F1_Score']:.4f}")
 
     else:
         config_yaml = Path(args.config_yaml)
@@ -113,37 +126,15 @@ def main():
             model = ModelCNN(arch, num_classes=num_classes)
             model.load(model_path)
 
-            test_preds = model.predict(test_images, batch_size=args.batch_size)
+            result, all_preds = evaluate_model(model, test_dataset, num_classes)
+            result['Architecture'] = arch
+            results.append(result)
 
-            accuracy = accuracy_score(test_labels, test_preds)
-            precision = precision_score(test_labels, test_preds, average='weighted', zero_division=0)
-            recall = recall_score(test_labels, test_preds, average='weighted', zero_division=0)
-            f1 = f1_score(test_labels, test_preds, average='weighted', zero_division=0)
-            results.append({
-                'Architecture': arch,
-                'Accuracy': accuracy,
-                'Precision': precision,
-                'Recall': recall,
-                'F1_Score': f1
-            })
-
-            if num_classes == 2:
-                cm = confusion_matrix(test_labels, test_preds)
-                if cm.size == 4:
-                    tn, fp, fn, tp = cm.ravel()
-                    results[-1].update({
-                        'TP': tp,
-                        'FP': fp,
-                        'FN': fn,
-                        'TN': tn
-                    })
-
-            print(f"{arch} - Accuracy: {accuracy:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
+            print(f"{arch} - Accuracy: {result['Accuracy']:.4f}, Precision: {result['Precision']:.4f}, Recall: {result['Recall']:.4f}, F1: {result['F1_Score']:.4f}")
 
     results_df = pd.DataFrame(results)
     print("\n=== Final Results ===")
     print(results_df.round(4))
-
 
 if __name__ == "__main__":
     main()
