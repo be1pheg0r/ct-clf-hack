@@ -43,7 +43,7 @@ def main():
                         help="Directory to save/load model checkpoints.")
     parser.add_argument("--train", type=int, choices=[0, 1], required=True,
                         help="Train models (1) or only evaluate (0).")
-    parser.add_argument("--config_yaml", type=str, default="configs/knn_models.yaml",
+    parser.add_argument("--config_yaml", type=str, default="configs/models.yaml",
                         help="YAML file with model paths for evaluation.")
     parser.add_argument("--k_clusters", type=int, nargs='+', default=[2, 4, 6, 8, 10],
                         help="K values for KNN clustering.")

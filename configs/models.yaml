@@ -1,12 +1,5 @@
-Inception_V3:
-  local: "checkpoints/default_Inception_V3.pth"
-  remote: "be1pheg0r/ct_clf_models"
-ResNet50:
-  local: "checkpoints/default_ResNet50.pth"
-  remote: "be1pheg0r/ct_clf_models"
-DenseNet121:
-  local: "checkpoints/default_DenseNet121.pth"
-  remote: "be1pheg0r/ct_clf_models"
-ConvNeXt_Tiny:
-  local: "checkpoints/default_ConvNeXt_Tiny.pth"
-  remote: "be1pheg0r/ct_clf_models"
+Inception_V3: "checkpoints/trained_Inception_V3.pth"
+ResNet50: "checkpoints/trained_ResNet50.pth"
+DenseNet121: "checkpoints/trained_DenseNet121.pth"
+ConvNeXt_Tiny: "checkpoints/trained_ConvNeXt_Tiny.pth"
+KNN_Clustering: "checkpoints/default_KNN_Clustering.joblib"
