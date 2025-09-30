@@ -3,6 +3,8 @@ import React from "react";
 import { Message } from "../App";
 import ResultCard from "./ResultCard";
 import DicomViewer from "./DicomViewer";
+import SkeletonViewer from "./SkeletonViewer";
+import SkeletonResultCard from "./SkeletonResultCard";
 import { ViewerData } from "../types";
 
 interface MessageProps {
@@ -21,6 +23,17 @@ const MessageBubble: React.FC<MessageProps> = ({ message }) => {
     );
   }
 
+  if (message.type === "result-loading") {
+    return (
+      <div className="message-row system-row">
+        <div style={{ width: 12 }} />
+        <div className="bubble bubble-system" style={{ padding: 10 }}>
+          <SkeletonResultCard />
+        </div>
+      </div>
+    );
+  }
+
   if (message.type === "viewer") {
     return (
       <div className="message-row system-row">
@@ -32,13 +45,12 @@ const MessageBubble: React.FC<MessageProps> = ({ message }) => {
     );
   }
 
-  // skeleton viewer
   if (message.type === "viewer-loading") {
     return (
       <div className="message-row system-row">
         <div style={{ width: 12 }} />
         <div className="bubble bubble-system" style={{ padding: 10 }}>
-          <DicomViewer data={{ frames: [] }} loading />
+          <SkeletonViewer />
         </div>
       </div>
     );
