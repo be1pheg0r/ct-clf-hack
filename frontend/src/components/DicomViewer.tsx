@@ -1,11 +1,13 @@
+// src/components/DicomViewer.tsx
 import React, { useEffect, useState, useRef } from "react";
 import { ViewerData } from "../types";
 
 interface Props {
   data: ViewerData;
+  loading?: boolean;
 }
 
-const DicomViewer: React.FC<Props> = ({ data }) => {
+const DicomViewer: React.FC<Props> = ({ data, loading = false }) => {
   const frames = data.frames || [];
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -33,8 +35,41 @@ const DicomViewer: React.FC<Props> = ({ data }) => {
     setPlaying(false);
   }, [data.frames]);
 
-  if (!frames.length)
-    return <div style={{ width: 520 }}>Нет доступных срезов для просмотра.</div>;
+  // Loading: оригинальный "сканер лёгкого"
+  if (loading) {
+    return (
+      <div className="dicom-viewer loading" style={{ width: 520 }}>
+        <div className="viewer-scan" style={{ height: 360, borderRadius: 12, overflow: "hidden", position: "relative" }}>
+          {/* фон + градиент */}
+          <div className="scan-bg" />
+          {/* стилизованная фигура лёгких (абстрактно) */}
+          <div className="lung-shape" aria-hidden>
+            <div className="lung left" />
+            <div className="lung right" />
+          </div>
+          {/* линия сканера движется сверху вниз */}
+          <div className="scan-line" />
+          {/* пульсирующая точка — будто сенсор */}
+          <div className="scan-dot" />
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "center" }}>
+          <div className="thumb-glow" />
+          <div className="thumb-glow" />
+          <div className="thumb-glow" />
+          <div style={{ flex: 1 }} />
+          <div className="small-glow" />
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <div className="bar-glow" style={{ width: "60%" }} />
+          <div className="bar-glow short" style={{ width: "20%" }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (!frames.length) return <div style={{ width: 520 }}>Нет доступных срезов для просмотра.</div>;
 
   return (
     <div className="dicom-viewer" style={{ width: 520 }}>
@@ -58,13 +93,13 @@ const DicomViewer: React.FC<Props> = ({ data }) => {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-        <button onClick={() => setIndex((i) => Math.max(0, i - 1))} title="Prev">
+        <button onClick={() => setIndex((i) => Math.max(0, i - 1))} title="Prev" disabled={frames.length === 0}>
           ◀
         </button>
-        <button onClick={() => setPlaying((p) => !p)} title="Play/Pause">
+        {/* <button onClick={() => setPlaying((p) => !p)} title="Play/Pause">
           {playing ? "⏸" : "▶"}
-        </button>
-        <button onClick={() => setIndex((i) => Math.min(frames.length - 1, i + 1))} title="Next">
+        </button> */}
+        <button onClick={() => setIndex((i) => Math.min(frames.length - 1, i + 1))} title="Next" disabled={frames.length === 0}>
           ▶
         </button>
 
@@ -75,7 +110,7 @@ const DicomViewer: React.FC<Props> = ({ data }) => {
             max={frames.length - 1}
             value={index}
             onChange={(e) => setIndex(parseInt(e.target.value))}
-            style={{ width: "100%" }}
+            style={{ width: "99%" }}
           />
         </div>
 
@@ -84,7 +119,7 @@ const DicomViewer: React.FC<Props> = ({ data }) => {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+      {/* <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
         <label style={{ fontSize: 12, color: "#6b7280" }}>Speed</label>
         <input
           type="range"
@@ -94,7 +129,7 @@ const DicomViewer: React.FC<Props> = ({ data }) => {
           onChange={(e) => setIntervalMs(parseInt(e.target.value))}
         />
         <div style={{ minWidth: 44, textAlign: "right" }}>{intervalMs} ms</div>
-      </div>
+      </div> */}
     </div>
   );
 };

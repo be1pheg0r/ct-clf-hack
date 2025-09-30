@@ -7,12 +7,13 @@ import { ResultData, ViewerData } from "./types";
 
 export interface Message {
   id: number;
-  type: "user" | "system" | "result" | "viewer";
+  type: "user" | "system" | "result" | "viewer" | "viewer-loading";
   content: string | ResultData | ViewerData;
 }
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [processing, setProcessing] = useState(false);
 
   const genId = () => Date.now() + Math.floor(Math.random() * 1000);
 
@@ -30,63 +31,101 @@ const App: React.FC = () => {
       return;
     }
 
+    // Блокируем повторные загрузки
+    setProcessing(true);
+
     const uploadingMsgId = genId();
+    const viewerLoadingMsgId = genId();
+
+    // Добавляем сообщение пользователя + skeleton status + viewer-loading (viewer-loading сразу после uploading)
     setMessages((prev) => [
       ...prev,
       { id: genId(), type: "user", content: `📦 ${file.name}` },
       { id: uploadingMsgId, type: "system", content: "⏳ Обработка файла..." },
+      { id: viewerLoadingMsgId, type: "viewer-loading", content: "loading" },
     ]);
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      // 1. Получаем метаданные
+      // 1) метаданные
       const metaRes = await fetch("http://localhost:8000/process-image", {
         method: "POST",
         body: formData,
       });
-      if (!metaRes.ok) throw new Error("Meta request failed");
+      if (!metaRes.ok) {
+        const text = await metaRes.text();
+        throw new Error(`Meta request failed: ${metaRes.status} ${text}`);
+      }
       const meta = await metaRes.json();
 
       const normalized: ResultData = {
         path_to_study: meta.path_to_study,
         study_uid: meta.study_uid,
         series_uid: meta.series_uid,
-        probability_of_pathology: meta.probability_of_pathology,
-        pathology: meta.pathology,
+        probability_of_pathology:
+          typeof meta.probability_of_pathology === "string"
+            ? parseFloat(meta.probability_of_pathology)
+            : meta.probability_of_pathology,
+        pathology: typeof meta.pathology === "string" ? parseInt(meta.pathology) : meta.pathology,
         processing_status: meta.processing_status,
         time_of_processing: meta.time_of_processing,
       };
 
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== uploadingMsgId),
-        { id: genId(), type: "result", content: normalized },
-      ]);
+      // Заменяем только uploadingMsgId на Result (оставляем viewer-loading на той же позиции)
+      setMessages((prev) =>
+        prev.map((m) => (m.id === uploadingMsgId ? { id: genId(), type: "result", content: normalized } : m))
+      );
 
-      // 2. Получаем viewer (кадры)
+      // 2) viewer — получаем кадры (если есть)
       const viewRes = await fetch("http://localhost:8000/viewer", {
         method: "POST",
         body: formData,
       });
+
       if (viewRes.ok) {
-        const data = await viewRes.json();
-        if (data.frames && data.frames.length > 0) {
-          setMessages((prev) => [
-            ...prev,
-            { id: genId(), type: "viewer", content: { frames: data.frames } },
-          ]);
+        const viewData = await viewRes.json();
+        const frames = Array.isArray(viewData.frames) ? viewData.frames : [];
+
+        if (frames.length > 0) {
+          // Заменяем viewer-loading (по id) на настоящий viewer
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === viewerLoadingMsgId
+                ? ({ id: genId(), type: "viewer", content: { frames } as ViewerData } as Message)
+                : m
+            )
+          );
+        } else {
+          // Нет кадров — просто удаляем viewer-loading
+          setMessages((prev) => prev.filter((m) => m.id !== viewerLoadingMsgId));
         }
+      } else {
+        // viewer returned error — заменяем skeleton на сообщение об ошибке
+        const text = await viewRes.text();
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === viewerLoadingMsgId
+              ? ({ id: genId(), type: "system", content: `❌ Viewer error: ${text}` } as Message)
+              : m
+          )
+        );
       }
     } catch (error: any) {
+      // При ошибке: убираем uploading & viewer-loading и показываем сообщение об ошибке
       setMessages((prev) => [
-        ...prev.filter((m) => m.id !== uploadingMsgId),
+        ...prev.filter((m) => m.id !== uploadingMsgId && m.id !== viewerLoadingMsgId),
         {
           id: genId(),
           type: "system",
-          content: `❌ Ошибка при обработке файла: ${error.message}`,
+          content:
+            error && error.message ? `❌ Ошибка при обработке файла: ${error.message}` : "❌ Ошибка при обработке файла",
         },
       ]);
+      console.error("Upload error:", error);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -115,9 +154,9 @@ const App: React.FC = () => {
       </main>
 
       <footer className="app-footer">
-        <FileUpload onFileUpload={handleFileUpload} />
+        <FileUpload onFileUpload={handleFileUpload} disabled={processing} />
         <div className="small-note">
-          Рекомендуется загружать ZIP с DICOM / подготовленной структурой исследования.
+          {processing ? "Обработка... загрузка временно заблокирована" : "Рекомендуется загружать ZIP с DICOM / подготовленной структурой исследования."}
         </div>
       </footer>
     </div>

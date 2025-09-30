@@ -1,10 +1,12 @@
+// src/components/FileUpload.tsx
 import React, { useRef, useState } from "react";
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
+  disabled?: boolean;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled = false }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -20,6 +22,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(false);
+    if (disabled) return;
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFile(e.dataTransfer.files[0]);
     }
@@ -27,10 +30,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
 
   return (
     <div
-      className={`upload-area ${dragOver ? "upload-area--active" : ""}`}
+      className={`upload-area ${dragOver ? "upload-area--active" : ""} ${disabled ? "upload-area--disabled" : ""}`}
       onDragOver={(e) => {
         e.preventDefault();
-        setDragOver(true);
+        if (!disabled) setDragOver(true);
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
@@ -41,18 +44,20 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
         accept=".zip,application/zip,application/x-zip-compressed"
         style={{ display: "none" }}
         onChange={onChange}
+        disabled={disabled}
       />
       <button
         className="upload-btn"
-        onClick={() => fileInputRef.current?.click()}
-        title="Загрузить ZIP"
+        onClick={() => !disabled && fileInputRef.current?.click()}
+        title={disabled ? "Загрузка заблокирована: обработка в процессе" : "Загрузить ZIP"}
+        disabled={disabled}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
           <path fill="currentColor" d="M12 2L12 14M12 2L7 7M12 2L17 7M5 20h14" />
         </svg>
-        <span>Загрузить ZIP</span>
+        <span>{disabled ? "Загрузка заблокирована" : "Загрузить ZIP"}</span>
       </button>
-      <div className="upload-hint">или перетащите ZIP сюда</div>
+      <div className="upload-hint">{disabled ? "Подождите, идёт обработка..." : "или перетащите ZIP сюда"}</div>
     </div>
   );
 };

@@ -1,3 +1,4 @@
+// src/components/MessageBubble.tsx
 import React from "react";
 import { Message } from "../App";
 import ResultCard from "./ResultCard";
@@ -26,6 +27,18 @@ const MessageBubble: React.FC<MessageProps> = ({ message }) => {
         <div style={{ width: 12 }} />
         <div className="bubble bubble-system" style={{ padding: 10 }}>
           <DicomViewer data={message.content as ViewerData} />
+        </div>
+      </div>
+    );
+  }
+
+  // skeleton viewer
+  if (message.type === "viewer-loading") {
+    return (
+      <div className="message-row system-row">
+        <div style={{ width: 12 }} />
+        <div className="bubble bubble-system" style={{ padding: 10 }}>
+          <DicomViewer data={{ frames: [] }} loading />
         </div>
       </div>
     );
