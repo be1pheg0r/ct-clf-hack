@@ -30,7 +30,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // Добавляем сообщение-пользователя и skeleton-статус
     const uploadingMsgId = genId();
     setMessages((prev) => [
       ...prev,
@@ -42,66 +41,52 @@ const App: React.FC = () => {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://localhost:8000/process-image", {
+      // 1. Получаем метаданные
+      const metaRes = await fetch("http://localhost:8000/process-image", {
         method: "POST",
         body: formData,
       });
+      if (!metaRes.ok) throw new Error("Meta request failed");
+      const meta = await metaRes.json();
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Server returned ${res.status}: ${text}`);
-      }
-
-      const data = await res.json();
-
-      // Нормализуем поля результата
       const normalized: ResultData = {
-        path_to_study: data.path_to_study,
-        study_uid: data.study_uid,
-        series_uid: data.series_uid,
-        probability_of_pathology:
-          typeof data.probability_of_pathology === "string"
-            ? parseFloat(data.probability_of_pathology)
-            : data.probability_of_pathology,
-        pathology:
-          typeof data.pathology === "string" ? parseInt(data.pathology) : data.pathology,
-        processing_status: data.processing_status,
-        time_of_processing: data.time_of_processing,
+        path_to_study: meta.path_to_study,
+        study_uid: meta.study_uid,
+        series_uid: meta.series_uid,
+        probability_of_pathology: meta.probability_of_pathology,
+        pathology: meta.pathology,
+        processing_status: meta.processing_status,
+        time_of_processing: meta.time_of_processing,
       };
 
-      // Проверяем frames (массив data:image/png;base64,...)
-      const viewer =
-        data.frames && Array.isArray(data.frames) && data.frames.length > 0
-          ? ({ frames: data.frames as string[] } as ViewerData)
-          : null;
-
-      // Собираем массив сообщений, который будем добавить — явно аннотируем как Message[]
-      const toAdd: Message[] = [
-        { id: genId(), type: "result", content: normalized },
-      ];
-      if (viewer) {
-        toAdd.push({ id: genId(), type: "viewer", content: viewer });
-      }
-
-      // Удаляем skeleton-статус и добавляем result + viewer (если есть)
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== uploadingMsgId),
-        ...toAdd,
+        { id: genId(), type: "result", content: normalized },
       ]);
+
+      // 2. Получаем viewer (кадры)
+      const viewRes = await fetch("http://localhost:8000/viewer", {
+        method: "POST",
+        body: formData,
+      });
+      if (viewRes.ok) {
+        const data = await viewRes.json();
+        if (data.frames && data.frames.length > 0) {
+          setMessages((prev) => [
+            ...prev,
+            { id: genId(), type: "viewer", content: { frames: data.frames } },
+          ]);
+        }
+      }
     } catch (error: any) {
-      // удаляем skeleton и показываем ошибку
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== uploadingMsgId),
         {
           id: genId(),
           type: "system",
-          content:
-            error && error.message
-              ? `❌ Ошибка при обработке файла: ${error.message}`
-              : "❌ Ошибка при обработке файла",
+          content: `❌ Ошибка при обработке файла: ${error.message}`,
         },
       ]);
-      console.error("Upload error:", error);
     }
   };
 
@@ -131,7 +116,9 @@ const App: React.FC = () => {
 
       <footer className="app-footer">
         <FileUpload onFileUpload={handleFileUpload} />
-        <div className="small-note">Рекомендуется загружать ZIP с DICOM / подготовленной структурой исследования.</div>
+        <div className="small-note">
+          Рекомендуется загружать ZIP с DICOM / подготовленной структурой исследования.
+        </div>
       </footer>
     </div>
   );
