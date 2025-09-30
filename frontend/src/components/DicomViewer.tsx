@@ -61,9 +61,9 @@ const DicomViewer: React.FC<Props> = ({ data }) => {
         <button onClick={() => setIndex((i) => Math.max(0, i - 1))} title="Prev">
           ◀
         </button>
-        {/* <button onClick={() => setPlaying((p) => !p)} title="Play/Pause">
+        <button onClick={() => setPlaying((p) => !p)} title="Play/Pause">
           {playing ? "⏸" : "▶"}
-        </button> */}
+        </button>
         <button onClick={() => setIndex((i) => Math.min(frames.length - 1, i + 1))} title="Next">
           ▶
         </button>
@@ -84,7 +84,7 @@ const DicomViewer: React.FC<Props> = ({ data }) => {
         </div>
       </div>
 
-      {/* <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
         <label style={{ fontSize: 12, color: "#6b7280" }}>Speed</label>
         <input
           type="range"
@@ -94,7 +94,7 @@ const DicomViewer: React.FC<Props> = ({ data }) => {
           onChange={(e) => setIntervalMs(parseInt(e.target.value))}
         />
         <div style={{ minWidth: 44, textAlign: "right" }}>{intervalMs} ms</div>
-      </div> */}
+      </div>
     </div>
   );
 };
