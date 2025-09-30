@@ -415,85 +415,94 @@ html,body,#root { height: 100%; margin: 0; background: var(--bg); }
 
 
 
+/* ---------- SkeletonViewer — more vivid colors ---------- */
+/* Палитра: яркий бирюзово-зелёный + холодный акцент, лёгкое свечение */
 
-
-/* ---- оригинальный skeleton 'сканер лёгкого' ---- */
-.viewer-scan {
+.skeleton-image {
   position: relative;
-  background: linear-gradient(180deg, #f6fbff 0%, #eef6fb 40%, #eaf1f7 100%);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: inset 0 -30px 60px rgba(10, 20, 40, 0.03);
+  background: linear-gradient(180deg, #f4fdfb 0%, #e9fbf4 40%, #eaf9f7 100%);
+  box-shadow: inset 0 -20px 50px rgba(4,20,30,0.04);
 }
 
-/* фон с мягкой текстурой */
+/* фон текстуры чуть холоднее — чтобы зелёные акценты выделялись */
 .scan-bg {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.35) 0%, transparent 20%),
-                    radial-gradient(circle at 80% 70%, rgba(255,255,255,0.18) 0%, transparent 18%),
-                    linear-gradient(180deg, rgba(14,50,80,0.02), rgba(14,50,80,0.00));
-  mix-blend-mode: normal;
+  background-image:
+    radial-gradient(circle at 25% 30%, rgba(255,255,255,0.65) 0%, transparent 14%),
+    radial-gradient(circle at 78% 72%, rgba(255,255,255,0.28) 0%, transparent 14%),
+    linear-gradient(180deg, rgba(6,18,30,0.01), rgba(6,18,30,0.00));
+  z-index: 0;
 }
 
-/* стилизованные 'лёгкие' — две полупрозрачные формы */
-.lung-shape {
-  position: absolute;
-  inset: 24px 32px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  pointer-events: none;
-  z-index: 2;
-}
+/* лёгкие — усиливаем основной оттенок и добавляем внутреннее свечение */
 .lung {
-  width: 36%;
-  height: 72%;
-  border-radius: 50% / 60%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
-  box-shadow: 0 8px 24px rgba(4,30,60,0.04);
-  margin: 0 10px;
-  transform: translateY(4px) rotate(-6deg);
-  opacity: 0.95;
-}
-.lung.right {
-  transform: translateY(4px) rotate(6deg);
+  width: 46%;
+  height: 80%;
+  border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255,255,255,0.28), rgba(255,255,255,0.06) 12%),
+    linear-gradient(180deg, rgba(6,200,150,0.14), rgba(6,170,135,0.06));
+  box-shadow: 0 18px 36px rgba(3,28,40,0.06), 0 0 30px rgba(6,200,150,0.06);
+  position: relative;
+  overflow: hidden;
+  transform-origin: center;
 }
 
-/* линия сканера: плавно движется сверху вниз */
+/* усиление декоративной 'венки' */
+.lung::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 18%;
+  bottom: 18%;
+  border-radius: 40% / 60%;
+  background-image: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.0));
+  box-shadow: inset 0 6px 26px rgba(2,30,20,0.03);
+  transform: skewY(-6deg);
+  opacity: 0.98;
+}
+
+/* цвет линии сканера — ярче и с небольшим свечением */
 .scan-line {
   position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, rgba(16,163,127,0.0), rgba(16,163,127,0.45), rgba(16,163,127,0.0));
-  animation: scanMove 2s linear infinite;
-  z-index: 4;
-  filter: drop-shadow(0 4px 8px rgba(16,163,127,0.08));
+  left: -12%;
+  right: -12%;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(90deg,
+    rgba(3,190,150,0.00) 0%,
+    rgba(3,190,150,0.85) 35%,
+    rgba(3,170,130,0.65) 60%,
+    rgba(3,190,150,0.00) 100%);
+  filter: blur(0.8px);
+  z-index: 3;
+  animation: scanMove 1.6s linear infinite;
+  box-shadow: 0 8px 30px rgba(3,190,150,0.10);
 }
 
-/* небольшой пульсирующий датчик (точка) */
+/* точка — насыщенный центр + мягкое свечение */
 .scan-dot {
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: radial-gradient(circle, #10a37f, #0b7f62);
-  top: 10%;
-  left: 50%;
-  transform: translateX(-50%);
-  box-shadow: 0 6px 20px rgba(16,163,127,0.14);
-  animation: dotMove 2s linear infinite;
-  z-index: 5;
+  background: radial-gradient(circle at 35% 30%, #b9ffee, #06d6a0 40%, #05b383 100%);
+  box-shadow: 0 10px 34px rgba(6,214,160,0.20), 0 2px 8px rgba(6,214,160,0.12);
+  z-index: 4;
+  animation: dotMove 1.6s linear infinite;
 }
 
-/* thumb glows */
+/* миниатюры — более заметный градиент и glow */
 .thumb-glow {
   width: 64px;
   height: 48px;
   border-radius: 8px;
-  background: linear-gradient(90deg, rgba(16,163,127,0.08), rgba(11,119,96,0.04));
-  box-shadow: 0 6px 18px rgba(11,119,96,0.05);
+  background: linear-gradient(90deg, rgba(6,214,160,0.14), rgba(3,150,110,0.06));
+  box-shadow: 0 10px 30px rgba(6,214,160,0.08);
   position: relative;
   overflow: hidden;
 }
@@ -501,48 +510,192 @@ html,body,#root { height: 100%; margin: 0; background: var(--bg); }
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
   mix-blend-mode: overlay;
-  animation: thumbShimmer 1.6s linear infinite;
+  animation: thumbShimmer 1.4s linear infinite;
 }
 
-/* bars */
-.bar-glow {
-  height: 10px;
-  border-radius: 8px;
-  background: linear-gradient(90deg, rgba(16,163,127,0.08), rgba(11,119,96,0.03));
-  box-shadow: 0 6px 18px rgba(11,119,96,0.04);
-  position: relative;
-  overflow: hidden;
-}
-.bar-glow.short {
-  width: 120px;
-}
-
-/* small block */
+/* small-glow — делаем чуть ярче */
 .small-glow {
   width: 48px;
   height: 28px;
   border-radius: 8px;
-  background: linear-gradient(90deg, rgba(16,163,127,0.06), rgba(11,119,96,0.02));
-  box-shadow: 0 6px 18px rgba(11,119,96,0.04);
+  background: linear-gradient(90deg, rgba(6,214,160,0.10), rgba(3,150,110,0.04));
+  box-shadow: 0 8px 22px rgba(6,214,160,0.07);
 }
 
-/* animations */
-@keyframes scanMove {
-  0% { top: -4%; opacity: 0; }
-  12% { opacity: 1; }
-  50% { top: 50%; opacity: 0.95; }
-  88% { opacity: 1; }
-  100% { top: 104%; opacity: 0; }
+/* бары — усиливаем с легким внутренним градиентом */
+.bar-glow {
+  height: 10px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(6,214,160,0.10), rgba(3,150,110,0.05));
+  box-shadow: 0 10px 24px rgba(3,150,110,0.05);
+  position: relative;
+  overflow: hidden;
 }
-@keyframes dotMove {
-  0% { top: 8%; transform: translateX(-50%) scale(1); opacity: 0.9; }
-  50% { top: 52%; transform: translateX(-50%) scale(1.25); opacity: 1; }
-  100% { top: 96%; transform: translateX(-50%) scale(1); opacity: 0.9; }
+.bar-glow.short { width: 120px; }
+
+/* подсветка внутри шкалы */
+.skeleton-progress-bar .skeleton-fill {
+  background: linear-gradient(90deg, rgba(6,214,160,0.28), rgba(6,200,150,0.18));
+  box-shadow: 0 6px 18px rgba(6,214,160,0.12);
 }
+
+/* увеличим контраст shimmer'а для миниатюр */
 @keyframes thumbShimmer {
   0% { transform: translateX(-100%); opacity: 0.06; }
-  50% { transform: translateX(0%); opacity: 0.12; }
+  50% { transform: translateX(0%); opacity: 0.16; }
   100% { transform: translateX(100%); opacity: 0.06; }
+}
+
+/* синхронизированные анимации (линия + точка) */
+@keyframes scanMove {
+  0%   { top: -8%; opacity: 0; }
+  8%   { opacity: 1; }
+  50%  { top: 50%; opacity: 0.98; }
+  92%  { opacity: 1; }
+  100% { top: 108%; opacity: 0; }
+}
+@keyframes dotMove {
+  0%   { top: -6%; transform: translateX(-50%) scale(0.92); opacity: 0.85; left: 50%; }
+  8%   { opacity: 1; }
+  50%  { top: 50%; transform: translateX(-50%) scale(1.28); opacity: 1; left: 50%; }
+  92%  { opacity: 1; }
+  100% { top: 106%; transform: translateX(-50%) scale(0.92); opacity: 0.85; left: 50%; }
+}
+
+/* немного усилим видимость скелета ResultCard (если используешь тот же акцент) */
+.skeleton-result-card .skeleton-fill {
+  background: linear-gradient(90deg, rgba(6,214,160,0.30), rgba(6,200,150,0.14));
+  box-shadow: 0 6px 16px rgba(6,214,160,0.08);
+}
+
+/* тонкие финальные правки для читаемости */
+.skeleton-line, .skeleton-percent, .skeleton-value {
+  background-size: 300% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+
+
+/* небольшая декоративная 'венка' внутри лёгкого */
+.lung::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 18%;
+  bottom: 18%;
+  border-radius: 40% / 60%;
+  background-image: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.0));
+  box-shadow: inset 0 6px 18px rgba(4,30,60,0.02);
+  transform: skewY(-6deg);
+  opacity: 0.9;
+}
+
+
+/* контур \"лёгких\" — две половинки */
+.lung-shape {
+  position: absolute;
+  inset: 28px 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1;
+  color: red;
+}
+
+.lung {
+  width: 46%;
+  height: 80%;
+  border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.22), rgba(25, 105, 255, 0.06) 15%),
+              linear-gradient(180deg, rgba(16,163,127,0.3), rgba(11,119,96,0.1));
+  box-shadow: 0 14px 30px rgba(3,16,30,0.04);
+  position: relative;
+  overflow: hidden;
+  transform-origin: center;
+}
+
+
+
+
+
+
+
+
+
+
+/* SkeletonResultCard styles */
+.skeleton-result-card {
+  width: 560px;
+  max-width: 100%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(248,250,252,0.95));
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 6px 20px rgba(7,11,24,0.04);
+  border: 1px solid rgba(12,17,28,0.04);
+  font-family: Inter, system-ui, Arial;
+}
+
+.skeleton-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.skeleton-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #eef6f3 0%, #f9fbfd 50%, #eef6f3 100%);
+  box-shadow: inset 0 -6px 12px rgba(11,119,96,0.02);
+  position: relative;
+  overflow: hidden;
+}
+.skeleton-badge {
+  width: 76px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(16,163,127,0.06));
+  margin-left: 12px;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e9eef3 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+.skeleton-line.short { width: 160px; }
+.skeleton-line.tiny { width: 90px; }
+.skeleton-line.small { height: 10px; width: 80px; }
+
+.skeleton-body { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.skeleton-row { display:flex; align-items:center; gap:12px; }
+.skeleton-row.small { align-items:flex-start; }
+
+.skeleton-label { width: 140px; height: 12px; border-radius: 6px; background: linear-gradient(90deg, #eef2f6, #f7fafc); }
+.skeleton-value { flex:1; height: 14px; border-radius: 6px; background: linear-gradient(90deg, #f3f6f9, #eef4f8); }
+.skeleton-value.long { height: 12px; }
+
+.skeleton-progress { display:flex; align-items:center; gap:10px; }
+.skeleton-progress-bar { flex:1; height:10px; background:#e9eef6; border-radius:999px; overflow:hidden; position:relative; }
+.skeleton-fill { position:absolute; left: -40%; top:0; bottom:0; width:40%; background: linear-gradient(90deg, rgba(16,163,127,0.24), rgba(16,163,127,0.08)); animation: slideFill 1.4s linear infinite; }
+.skeleton-percent { width:44px; height:14px; border-radius:6px; background: linear-gradient(90deg, #f3f4f6, #eef4f9); }
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes slideFill {
+  0% { left: -40%; width: 40%; opacity: 0.6; }
+  50% { left: 30%; width: 24%; opacity: 1; }
+  100% { left: 110%; width: 40%; opacity: 0.6; }
 }

@@ -56,7 +56,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled = false 
           <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
             <path stroke="currentColor" d="M12 2L12 14M12 2L7 7M12 2L17 7M5 20h14" />
           </svg>
-
+        
         <span>{disabled ? "Загрузка заблокирована" : "Загрузить ZIP"}</span>
       </button>
       <div className="upload-hint">{disabled ? "Подождите, идёт обработка..." : "или перетащите ZIP сюда"}</div>

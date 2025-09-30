@@ -7,7 +7,7 @@ import { ResultData, ViewerData } from "./types";
 
 export interface Message {
   id: number;
-  type: "user" | "system" | "result" | "viewer" | "viewer-loading";
+  type: "user" | "system" | "result" | "viewer" | "viewer-loading" | "result-loading";
   content: string | ResultData | ViewerData;
 }
 
@@ -31,17 +31,17 @@ const App: React.FC = () => {
       return;
     }
 
-    // Блокируем повторные загрузки
     setProcessing(true);
 
-    const uploadingMsgId = genId();
+    const userMsgId = genId();
+    const resultLoadingMsgId = genId();
     const viewerLoadingMsgId = genId();
 
-    // Добавляем сообщение пользователя + skeleton status + viewer-loading (viewer-loading сразу после uploading)
+    // Добавляем: пользователь -> result-skeleton -> viewer-skeleton
     setMessages((prev) => [
       ...prev,
-      { id: genId(), type: "user", content: `📦 ${file.name}` },
-      { id: uploadingMsgId, type: "system", content: "⏳ Обработка файла..." },
+      { id: userMsgId, type: "user", content: `📦 ${file.name}` },
+      { id: resultLoadingMsgId, type: "result-loading", content: "loading" },
       { id: viewerLoadingMsgId, type: "viewer-loading", content: "loading" },
     ]);
 
@@ -73,12 +73,12 @@ const App: React.FC = () => {
         time_of_processing: meta.time_of_processing,
       };
 
-      // Заменяем только uploadingMsgId на Result (оставляем viewer-loading на той же позиции)
+      // Заменяем skeleton результата (resultLoadingMsgId) на реальную ResultCard
       setMessages((prev) =>
-        prev.map((m) => (m.id === uploadingMsgId ? { id: genId(), type: "result", content: normalized } : m))
+        prev.map((m) => (m.id === resultLoadingMsgId ? { id: genId(), type: "result", content: normalized } : m))
       );
 
-      // 2) viewer — получаем кадры (если есть)
+      // 2) viewer
       const viewRes = await fetch("http://localhost:8000/viewer", {
         method: "POST",
         body: formData,
@@ -89,7 +89,6 @@ const App: React.FC = () => {
         const frames = Array.isArray(viewData.frames) ? viewData.frames : [];
 
         if (frames.length > 0) {
-          // Заменяем viewer-loading (по id) на настоящий viewer
           setMessages((prev) =>
             prev.map((m) =>
               m.id === viewerLoadingMsgId
@@ -98,11 +97,9 @@ const App: React.FC = () => {
             )
           );
         } else {
-          // Нет кадров — просто удаляем viewer-loading
           setMessages((prev) => prev.filter((m) => m.id !== viewerLoadingMsgId));
         }
       } else {
-        // viewer returned error — заменяем skeleton на сообщение об ошибке
         const text = await viewRes.text();
         setMessages((prev) =>
           prev.map((m) =>
@@ -113,9 +110,8 @@ const App: React.FC = () => {
         );
       }
     } catch (error: any) {
-      // При ошибке: убираем uploading & viewer-loading и показываем сообщение об ошибке
       setMessages((prev) => [
-        ...prev.filter((m) => m.id !== uploadingMsgId && m.id !== viewerLoadingMsgId),
+        ...prev.filter((m) => m.id !== resultLoadingMsgId && m.id !== viewerLoadingMsgId),
         {
           id: genId(),
           type: "system",
@@ -141,7 +137,6 @@ const App: React.FC = () => {
             <span className="brand-sub">КТ грудной клетки — автоматический скрининг</span>
           </div>
         </div>
-
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button className="ghost-btn" onClick={handleClear} title="Очистить чат">
             Очистить
