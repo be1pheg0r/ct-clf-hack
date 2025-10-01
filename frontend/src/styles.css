@@ -1063,3 +1063,55 @@ html,body,#root { height: 100%; margin: 0; background: var(--bg); }
   word-break: break-word;
   min-width: 0; /* VERY IMPORTANT: allow flex children to shrink */
 }
+
+/* PathField (wrap & copy) */
+.path-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0; /* позволяет корректно сжиматься внутри flex-контейнера */
+}
+
+.path-text {
+  font-size: 14px;
+  color: #0f172a;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+/* copy button styling similar to uid-copy-btn */
+.path-copy-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(2,6,23,0.05);
+  background: transparent;
+  color: #0f172a;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  width: 36px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .12s ease, transform .06s ease;
+}
+.path-copy-btn:hover:not(:disabled) {
+  background: rgba(2,6,23,0.04);
+  transform: translateY(-1px);
+}
+.path-copy-btn:active {
+  transform: translateY(0);
+}
+.path-copy-btn[aria-label="Скопировано"] {
+  background: rgba(6,214,160,0.08);
+  color: #047857;
+}
+
+/* ensure row-value remains responsive */
+.row-value { min-width: 0; }
