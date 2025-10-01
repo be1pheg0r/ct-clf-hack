@@ -4,15 +4,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from io import BytesIO
 import zipfile
-import cv2
-import numpy as np
-import pydicom
 import base64
 import time
-from pydantic import BaseModel
+import traceback
 from typing import List, Tuple, Any
 
-# ----- Pydantic schema -----
+import numpy as np
+import cv2
+import pydicom
+import pandas as pd
+from pydantic import BaseModel
+
+# ----------------- Pydantic schema -----------------
 class OutputData(BaseModel):
     path_to_study: str
     study_uid: str
@@ -22,22 +25,20 @@ class OutputData(BaseModel):
     processing_status: str
     time_of_processing: float
 
-# ----- App -----
+# ----------------- App init -----------------
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # для dev; в проде сузить
+    allow_origins=["*"],  # dev; ограничь в проде
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ----------------- Helpers -----------------
 def _normalize_to_uint8(arr: np.ndarray, target_max_width: int = 1024) -> np.ndarray:
-    """Нормализует массив в uint8 и ресайзит по ширине если нужно."""
-    # Приводим к float
     a = arr.astype(np.float32)
-    # Если есть оконные уровни в DICOM — можно их тут применить (упрощенно не делаем)
     mn = np.nanmin(a)
     mx = np.nanmax(a)
     if mx - mn > 0:
@@ -54,32 +55,135 @@ def _normalize_to_uint8(arr: np.ndarray, target_max_width: int = 1024) -> np.nda
         a = cv2.resize(a, (new_w, new_h), interpolation=cv2.INTER_AREA)
     return a
 
+def _build_report_xlsx_bytes(output_dict: dict) -> bytes:
+    """
+    output_dict should contain keys:
+    path_to_study, study_uid, series_uid, probability_of_pathology,
+    pathology, processing_status, time_of_processing
+    Returns bytes of xlsx file.
+    """
+    cols = [
+        "path_to_study",
+        "study_uid",
+        "series_uid",
+        "probability_of_pathology",
+        "pathology",
+        "processing_status",
+        "time_of_processing",
+    ]
+    row = {c: output_dict.get(c, "") for c in cols}
+    df = pd.DataFrame([row], columns=cols)
+    output = BytesIO()
+    df.to_excel(output, index=False, engine="openpyxl")
+    output.seek(0)
+    return output.read()
+
+# ----------------- Endpoints -----------------
 @app.post("/process-image")
 async def process_image(file: UploadFile = File(...), dev: bool = True):
-    if dev:
-        response = OutputData(
-            path_to_study="Путь к исследованию",
-            study_uid="Идентификатор исследования",
-            series_uid="Идентификатор серии",
-            probability_of_pathology=0.85,
-            pathology=1,
-            processing_status="Success",
-            time_of_processing=12.34,
-        )
-        return JSONResponse(content=response.model_dump(mode="json"))
+    """
+    Возвращает JSON с полями:
+    - path_to_study, study_uid, series_uid, probability_of_pathology, pathology, processing_status, time_of_processing
+    - report_xlsx: data:...;base64,... (XLSX generated from those fields)
+    (frames не возвращаем здесь — для них отдельный endpoint /viewer)
+    """
+    try:
+        raw = await file.read()
 
-    # Здесь должна быть реальная модельная логика
-    t0 = time.time()
-    response = OutputData(
-        path_to_study="/real/path",
-        study_uid="study123",
-        series_uid="series456",
-        probability_of_pathology=0.42,
-        pathology=0,
-        processing_status="Success",
-        time_of_processing=round(time.time() - t0, 2),
-    )
-    return JSONResponse(content=response.model_dump(mode="json"))
+        # dev stub
+        if dev:
+            response_obj = OutputData(
+                path_to_study="Путь к исследованию",
+                study_uid="Идентификатор исследования",
+                series_uid="Идентификатор серии",
+                probability_of_pathology=0.85,
+                pathology=1,
+                processing_status="Success",
+                time_of_processing=12.34,
+            )
+            resp = response_obj.model_dump(mode="json")  # dict
+
+            # generate xlsx bytes via pandas + BytesIO
+            xlsx_bytes = _build_report_xlsx_bytes(resp)
+            b64 = base64.b64encode(xlsx_bytes).decode("ascii")
+            data_uri = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + b64
+            resp["report_xlsx"] = data_uri
+            # optionally: resp["frames"] = []
+            return JSONResponse(content=resp)
+
+        # ---------- production flow (example) ----------
+        # try to extract some DICOM tags from uploaded zip
+        t0 = time.time()
+        study_uid = ""
+        series_uid = ""
+        path_to_study = ""
+        probability = 0.0
+        pathology_flag = 0
+        processing_status = "Failure"
+
+        # if uploaded file is zip, try to read first dcm and extract study/series UIDs
+        try:
+            if zipfile.is_zipfile(BytesIO(raw)):
+                with zipfile.ZipFile(BytesIO(raw)) as zf:
+                    infos = [info for info in zf.infolist() if not info.is_dir()]
+                    for info in infos:
+                        try:
+                            data = zf.read(info.filename)
+                            ds = pydicom.dcmread(BytesIO(data), stop_before_pixels=True, force=True)
+                            # try to extract StudyInstanceUID / SeriesInstanceUID if present
+                            if not study_uid and hasattr(ds, "StudyInstanceUID"):
+                                study_uid = str(ds.StudyInstanceUID)
+                            if not series_uid and hasattr(ds, "SeriesInstanceUID"):
+                                series_uid = str(ds.SeriesInstanceUID)
+                            # break when at least study found
+                            if study_uid and series_uid:
+                                break
+                        except Exception:
+                            continue
+                    path_to_study = "uploaded_zip"
+            else:
+                # not a zip — try read as single DICOM
+                try:
+                    ds = pydicom.dcmread(BytesIO(raw), stop_before_pixels=True, force=True)
+                    if hasattr(ds, "StudyInstanceUID"):
+                        study_uid = str(ds.StudyInstanceUID)
+                    if hasattr(ds, "SeriesInstanceUID"):
+                        series_uid = str(ds.SeriesInstanceUID)
+                    path_to_study = "single_dicom"
+                except Exception:
+                    path_to_study = "unknown"
+        except Exception:
+            # ignore extraction failure, keep defaults
+            pass
+
+        # here put your real model inference logic to compute probability/pathology
+        # for example we just fill with demo logic:
+        probability = 0.42
+        pathology_flag = 0
+        processing_status = "Success"
+        time_of_processing = round(time.time() - t0, 2)
+
+        response_obj = OutputData(
+            path_to_study=path_to_study,
+            study_uid=study_uid or "unknown",
+            series_uid=series_uid or "unknown",
+            probability_of_pathology=probability,
+            pathology=pathology_flag,
+            processing_status=processing_status,
+            time_of_processing=time_of_processing,
+        )
+        resp = response_obj.model_dump(mode="json")
+
+        # generate xlsx bytes
+        xlsx_bytes = _build_report_xlsx_bytes(resp)
+        b64 = base64.b64encode(xlsx_bytes).decode("ascii")
+        data_uri = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + b64
+        resp["report_xlsx"] = data_uri
+
+        return JSONResponse(content=resp)
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(content={"processing_status": "Failure", "error": str(e)}, status_code=500)
 
 
 @app.post("/viewer")
@@ -98,42 +202,34 @@ async def viewer(file: UploadFile = File(...)):
 
             candidates: List[Tuple[Any, bytes, str]] = []  # (sort_key, raw_bytes, name)
 
-            # Пробуем открыть каждый файл как DICOM
             for info in infolist:
                 try:
                     data = zf.read(info.filename)
-                    # Попробуем прочитать заголовок (force=True чтобы читать без расширения)
-                    ds = pydicom.dcmread(BytesIO(data), stop_before_pixels=True, force=True)
-                    # Определяем сортировочный ключ (InstanceNumber, SliceLocation, ImagePositionPatient z, fallback)
+                    ds_head = pydicom.dcmread(BytesIO(data), stop_before_pixels=True, force=True)
                     key = None
-                    if hasattr(ds, "InstanceNumber"):
+                    if hasattr(ds_head, "InstanceNumber"):
                         try:
-                            key = int(ds.InstanceNumber)
+                            key = int(ds_head.InstanceNumber)
                         except Exception:
                             key = None
-                    if key is None and hasattr(ds, "SliceLocation"):
+                    if key is None and hasattr(ds_head, "SliceLocation"):
                         try:
-                            key = float(ds.SliceLocation)
+                            key = float(ds_head.SliceLocation)
                         except Exception:
                             key = None
-                    if key is None and hasattr(ds, "ImagePositionPatient"):
-                        ip = ds.ImagePositionPatient
+                    if key is None and hasattr(ds_head, "ImagePositionPatient"):
+                        ip = ds_head.ImagePositionPatient
                         try:
-                            # ImagePositionPatient = [x, y, z]
                             key = float(ip[2])
                         except Exception:
                             key = None
                     candidates.append((key, data, info.filename))
                 except Exception:
-                    # если не DICOM — просто пропускаем
                     continue
 
             if not candidates:
-                # На всякий случай попробуем прочитать все как DICOM напрямую (force)
-                # но если и так ничего — возвращаем пустой список
                 return JSONResponse(content={"frames": []})
 
-            # Сортируем: те, у кого есть ключ идут первыми по ключу, потом по имени файла
             def _sort_key(item):
                 k, _, name = item
                 return (0, 0) if k is None else (1, k)
@@ -141,7 +237,7 @@ async def viewer(file: UploadFile = File(...)):
             candidates_sorted = sorted(candidates, key=_sort_key)
 
             frames: List[str] = []
-            max_frames = 300  # ограничение общего числа возвращаемых срезов
+            max_frames = 300
             for key, raw_bytes, name in candidates_sorted:
                 if len(frames) >= max_frames:
                     break
@@ -149,26 +245,19 @@ async def viewer(file: UploadFile = File(...)):
                     ds = pydicom.dcmread(BytesIO(raw_bytes), force=True)
                     if not hasattr(ds, "PixelData"):
                         continue
-                    arr = ds.pixel_array  # numpy array
-
-                    # Обработка возможных форматов pixel_array:
-                    # - многокадровый: shape (frames, rows, cols)
-                    # - мультиканальный: shape (rows, cols, samples)
-                    # - монохромный: shape (rows, cols)
+                    arr = ds.pixel_array
                     if arr is None:
                         continue
 
                     if arr.ndim == 3:
-                        # возможно (frames, rows, cols) либо (rows, cols, samples)
-                        # если первый размер >1 и меньше, чем небольшое число — считаем стеком
-                        if arr.shape[0] > 1 and arr.shape[0] <= 1024 and arr.shape[1] > 16:
-                            # многокадровый DICOM — добавляем кадры по одному
+                        # (frames, rows, cols) or (rows, cols, channels)
+                        if arr.shape[0] > 1 and arr.shape[1] > 10:
+                            # multiline frames
                             for i in range(arr.shape[0]):
                                 if len(frames) >= max_frames:
                                     break
                                 img = arr[i]
                                 if img.ndim == 3 and img.shape[2] > 1:
-                                    # цвет / multi-sample: берем первый канал или делаем BGR
                                     img2 = img[:, :, 0]
                                 else:
                                     img2 = img
@@ -178,8 +267,7 @@ async def viewer(file: UploadFile = File(...)):
                                     b64 = base64.b64encode(buf.tobytes()).decode("ascii")
                                     frames.append("data:image/png;base64," + b64)
                         else:
-                            # скорее всего (rows, cols, channels) — возьмём первый канал
-                            img = arr[:, :, 0]
+                            img = arr[:, :, 0] if arr.shape[2] > 1 else arr
                             img_u8 = _normalize_to_uint8(img)
                             ok, buf = cv2.imencode(".png", img_u8)
                             if ok:
@@ -192,7 +280,6 @@ async def viewer(file: UploadFile = File(...)):
                             b64 = base64.b64encode(buf.tobytes()).decode("ascii")
                             frames.append("data:image/png;base64," + b64)
                     else:
-                        # нестандартный формат — пытаемся свести к 2D
                         try:
                             img = np.squeeze(arr)
                             if img.ndim == 2:
@@ -203,14 +290,12 @@ async def viewer(file: UploadFile = File(...)):
                                     frames.append("data:image/png;base64," + b64)
                         except Exception:
                             continue
-
                 except Exception:
-                    # игнорируем проблемный файл, продолжаем
                     continue
 
             return JSONResponse(content={"frames": frames})
-
     except Exception as e:
+        traceback.print_exc()
         return JSONResponse(content={"error": f"Viewer processing failed: {str(e)}"}, status_code=500)
 
 

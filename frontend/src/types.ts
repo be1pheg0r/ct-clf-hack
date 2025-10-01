@@ -1,5 +1,6 @@
 export interface ViewerData {
   frames: string[]; // data:image/png;base64,...
+  loading?: boolean;
 }
 
 export interface ResultData {
@@ -10,4 +11,5 @@ export interface ResultData {
   pathology?: number | string;
   processing_status?: string;
   time_of_processing?: string | number;
+  report_xlsx?: string; // data URI: data:...;base64,...
 }
