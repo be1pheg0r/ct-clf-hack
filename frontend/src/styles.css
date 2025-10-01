@@ -790,10 +790,8 @@ html,body,#root { height: 100%; margin: 0; background: var(--bg); }
 
 /* ResultCard footer & download button placement */
 .result-card-footer {
-  display: flex;
-  justify-content: left; /* align right on desktop */
-  gap: 8px;
   width: 100%;
+  display: block;
 }
 
 /* On small screens center the button and allow it to be full-width */
@@ -808,5 +806,61 @@ html,body,#root { height: 100%; margin: 0; background: var(--bg); }
   }
   .file-ext-badge {
     display: none; /* small screens: hide compact badge to save space */
+  }
+}
+
+.download-btn.download-full {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-around; /* icon left, badge right */
+  gap: 6px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
+
+.download-btn.download-full .download-label {
+  flex: 1;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.download-btn.download-full .download-icon {
+  width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.download-btn.download-full .file-ext-badge {
+  min-width: 52px;
+  text-align: center;
+}
+
+/* XLSX variant (green) */
+.download-btn.xlsx {
+  background: linear-gradient(90deg, #08b786 0%, #05a06b 100%);
+  color: white;
+  box-shadow: 0 8px 26px rgba(6,167,120,0.18), inset 0 -6px 18px rgba(0,0,0,0.04);
+  border: none;
+  border-radius: 10px;
+}
+
+/* disabled look */
+.download-btn[disabled], .download-btn[aria-disabled="true"] {
+  opacity: 0.56;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Responsive tweaks: keep full-width on small screens, hide badge if needed */
+@media (max-width: 640px) {
+  .download-btn.download-full {
+    padding: 12px;
+  }
+  .file-ext-badge {
+    display: none;
   }
 }

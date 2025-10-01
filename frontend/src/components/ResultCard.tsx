@@ -71,7 +71,6 @@ const ResultCard: React.FC<Props> = ({ data }) => {
           <div className={`result-badge ${pathologyFlag === 0 ? "normal" : "abnormal"}`}>
             {pathologyFlag === 0 ? "Норма" : "Патология"}
           </div>
-          {/* Кнопка убрана из хедера — теперь внизу карточки */}
         </div>
       </div>
 
@@ -114,10 +113,10 @@ const ResultCard: React.FC<Props> = ({ data }) => {
           <div className="row-value">{data.time_of_processing || "—"} сек</div>
         </div>
 
-        {/* footer with download button */}
-        <div className="result-card-footer" style={{ marginTop: 12 }}>
+        {/* footer with full-width download button */}
+        <div className="result-card-footer" style={{ marginTop: 14 }}>
           <button
-            className="download-btn xlsx"
+            className="download-btn xlsx download-full"
             onClick={handleDownloadClick}
             disabled={downloading || !data.report_xlsx}
             aria-disabled={downloading || !data.report_xlsx}
