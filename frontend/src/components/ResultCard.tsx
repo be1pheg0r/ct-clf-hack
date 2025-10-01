@@ -1,6 +1,7 @@
 // src/components/ResultCard.tsx
 import React, { useState } from "react";
 import { ResultData } from "../types";
+import UIDField from "./UIDField";
 
 interface Props {
   data: ResultData;
@@ -82,13 +83,18 @@ const ResultCard: React.FC<Props> = ({ data }) => {
 
         <div className="row">
           <div className="row-label">Study UID</div>
-          <div className="row-value">{data.study_uid || "—"}</div>
+          <div className="row-value">
+            <UIDField uid={data.study_uid as string | undefined} />
+          </div>
         </div>
 
         <div className="row">
           <div className="row-label">Series UID</div>
-          <div className="row-value">{data.series_uid || "—"}</div>
+          <div className="row-value">
+            <UIDField uid={data.series_uid as string | undefined} />
+          </div>
         </div>
+
 
 
         <div className="row">
@@ -114,7 +120,6 @@ const ResultCard: React.FC<Props> = ({ data }) => {
           </div>
         </div>
         
-        {/* footer with full-width download button */}
         <div className="result-card-footer" style={{ marginTop: 14 }}>
           <button
             className="download-btn xlsx download-full"
