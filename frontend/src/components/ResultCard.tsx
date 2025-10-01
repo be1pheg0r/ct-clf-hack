@@ -90,6 +90,17 @@ const ResultCard: React.FC<Props> = ({ data }) => {
           <div className="row-value">{data.series_uid || "—"}</div>
         </div>
 
+
+        <div className="row">
+          <div className="row-label">Статус обработки</div>
+          <div className="row-value">{data.processing_status || "—"}</div>
+        </div>
+
+        <div className="row">
+          <div className="row-label">Время обработки</div>
+          <div className="row-value">{data.time_of_processing || "—"} сек</div>
+        </div>
+
         <div className="row">
           <div className="row-label">Вероятность патологии</div>
           <div className="row-value progress-col">
@@ -102,17 +113,7 @@ const ResultCard: React.FC<Props> = ({ data }) => {
             <div className="percent-text">{prob}%</div>
           </div>
         </div>
-
-        <div className="row">
-          <div className="row-label">Статус обработки</div>
-          <div className="row-value">{data.processing_status || "—"}</div>
-        </div>
-
-        <div className="row">
-          <div className="row-label">Время обработки</div>
-          <div className="row-value">{data.time_of_processing || "—"} сек</div>
-        </div>
-
+        
         {/* footer with full-width download button */}
         <div className="result-card-footer" style={{ marginTop: 14 }}>
           <button
