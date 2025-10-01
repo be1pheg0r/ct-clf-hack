@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const genId = () => Date.now() + Math.floor(Math.random() * 1000);
 
   const handleFileUpload = async (file: File) => {
+    if (processing) return;
     const isZip =
       file.name.toLowerCase().endsWith(".zip") ||
       file.type === "application/zip" ||
@@ -37,7 +38,6 @@ const App: React.FC = () => {
     const resultLoadingMsgId = genId();
     const viewerLoadingMsgId = genId();
 
-    // Добавляем: пользователь -> result-skeleton -> viewer-skeleton
     setMessages((prev) => [
       ...prev,
       { id: userMsgId, type: "user", content: `📦 ${file.name}` },
@@ -49,7 +49,7 @@ const App: React.FC = () => {
     formData.append("file", file);
 
     try {
-      // 1) метаданные
+      // 1) process-image (metadata + report_xlsx)
       const metaRes = await fetch("http://localhost:8000/process-image", {
         method: "POST",
         body: formData,
@@ -68,17 +68,19 @@ const App: React.FC = () => {
           typeof meta.probability_of_pathology === "string"
             ? parseFloat(meta.probability_of_pathology)
             : meta.probability_of_pathology,
-        pathology: typeof meta.pathology === "string" ? parseInt(meta.pathology) : meta.pathology,
+        pathology:
+          typeof meta.pathology === "string" ? parseInt(meta.pathology) : meta.pathology,
         processing_status: meta.processing_status,
         time_of_processing: meta.time_of_processing,
+        report_xlsx: typeof meta.report_xlsx === "string" ? meta.report_xlsx : undefined,
       };
 
-      // Заменяем skeleton результата (resultLoadingMsgId) на реальную ResultCard
+      // replace result-loading with actual result (preserve viewer-loading position)
       setMessages((prev) =>
         prev.map((m) => (m.id === resultLoadingMsgId ? { id: genId(), type: "result", content: normalized } : m))
       );
 
-      // 2) viewer
+      // 2) viewer — request frames and replace viewer-loading with viewer message
       const viewRes = await fetch("http://localhost:8000/viewer", {
         method: "POST",
         body: formData,
@@ -87,25 +89,21 @@ const App: React.FC = () => {
       if (viewRes.ok) {
         const viewData = await viewRes.json();
         const frames = Array.isArray(viewData.frames) ? viewData.frames : [];
-
         if (frames.length > 0) {
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === viewerLoadingMsgId
-                ? ({ id: genId(), type: "viewer", content: { frames } as ViewerData } as Message)
-                : m
+              m.id === viewerLoadingMsgId ? ({ id: genId(), type: "viewer", content: { frames } as ViewerData } as Message) : m
             )
           );
         } else {
+          // no frames -> remove skeleton
           setMessages((prev) => prev.filter((m) => m.id !== viewerLoadingMsgId));
         }
       } else {
         const text = await viewRes.text();
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === viewerLoadingMsgId
-              ? ({ id: genId(), type: "system", content: `❌ Viewer error: ${text}` } as Message)
-              : m
+            m.id === viewerLoadingMsgId ? ({ id: genId(), type: "system", content: `❌ Viewer error: ${text}` } as Message) : m
           )
         );
       }
@@ -137,6 +135,7 @@ const App: React.FC = () => {
             <span className="brand-sub">КТ грудной клетки — автоматический скрининг</span>
           </div>
         </div>
+
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button className="ghost-btn" onClick={handleClear} title="Очистить чат">
             Очистить
