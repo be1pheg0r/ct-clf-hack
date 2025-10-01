@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { ResultData } from "../types";
 import UIDField from "./UIDField";
+import PathField from "./PathField"; 
 
 interface Props {
   data: ResultData;
@@ -76,9 +77,15 @@ const ResultCard: React.FC<Props> = ({ data }) => {
       </div>
 
       <div className="result-body">
-        <div className="row">
+        {/* <div className="row">
           <div className="row-label">Путь</div>
           <div className="row-value">{data.path_to_study || "—"}</div>
+        </div> */}
+        <div className="row">
+          <div className="row-label">Путь</div>
+          <div className="row-value">
+            <PathField path={data.path_to_study as string | undefined} />
+          </div>
         </div>
 
         <div className="row">
@@ -119,7 +126,7 @@ const ResultCard: React.FC<Props> = ({ data }) => {
             <div className="percent-text">{prob}%</div>
           </div>
         </div>
-        
+
         <div className="result-card-footer" style={{ marginTop: 14 }}>
           <button
             className="download-btn xlsx download-full"

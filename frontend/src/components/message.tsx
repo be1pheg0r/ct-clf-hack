@@ -65,7 +65,7 @@ const MessageBubble: React.FC<MessageProps> = ({ message }) => {
       <div className={`bubble ${isUser ? "bubble-user" : "bubble-system"}`}>
         <div className="bubble-content">{text}</div>
       </div>
-      {isUser && <div className="avatar avatar-user">Вы</div>}
+      {/* {isUser && <div className="avatar avatar-user">Вы</div>} */}
     </div>
   );
 };
