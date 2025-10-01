@@ -7,13 +7,15 @@ import zipfile
 import base64
 import time
 import traceback
-from typing import List, Tuple, Any
+from typing import List, Dict, Any, Tuple
 
 import numpy as np
 import cv2
-import pydicom
 import pandas as pd
 from pydantic import BaseModel
+
+# импорт заглушки модели (файл model_connector.py в той же папке)
+from model_connector import ConnectingLinkWithModel
 
 # ----------------- Pydantic schema -----------------
 class OutputData(BaseModel):
@@ -24,6 +26,7 @@ class OutputData(BaseModel):
     pathology: int
     processing_status: str
     time_of_processing: float
+    xlsx_bytes: str
 
 # ----------------- App init -----------------
 app = FastAPI()
@@ -78,7 +81,30 @@ def _build_report_xlsx_bytes(output_dict: dict) -> bytes:
     output.seek(0)
     return output.read()
 
-# ----------------- Endpoints -----------------
+def _is_probable_dicom(raw_bytes: bytes) -> bool:
+    """
+    Быстрая эвристика: проверяем наличие DICM signature на позиции 128
+    или попытаемся dcmread с stop_before_pixels (если pydicom доступен).
+    Возвращает True если похоже на DICOM.
+    """
+    try:
+        if len(raw_bytes) > 132 and raw_bytes[128:132] == b"DICM":
+            return True
+        # quick header attempt via pydicom if available
+        try:
+            import pydicom
+            from io import BytesIO as _B
+            ds = pydicom.dcmread(_B(raw_bytes), stop_before_pixels=True, force=True)
+            # if read succeeded and has any common attributes, consider it DICOM
+            if hasattr(ds, "SOPClassUID") or hasattr(ds, "StudyInstanceUID"):
+                return True
+        except Exception:
+            return False
+    except Exception:
+        return False
+    return False
+
+# ----------------- Endpoint -----------------
 @app.post("/process-image")
 async def process_image(file: UploadFile = File(...), dev: bool = True):
     """
@@ -111,17 +137,13 @@ async def process_image(file: UploadFile = File(...), dev: bool = True):
             # optionally: resp["frames"] = []
             return JSONResponse(content=resp)
 
-        # ---------- production flow (example) ----------
-        # try to extract some DICOM tags from uploaded zip
+        # ---------- production flow ----------
         t0 = time.time()
-        study_uid = ""
-        series_uid = ""
-        path_to_study = ""
-        probability = 0.0
-        pathology_flag = 0
         processing_status = "Failure"
 
-        # if uploaded file is zip, try to read first dcm and extract study/series UIDs
+        # collect candidate dicom files as list of (filename, bytes)
+        dicom_candidates: List[Tuple[str, bytes]] = []
+
         try:
             if zipfile.is_zipfile(BytesIO(raw)):
                 with zipfile.ZipFile(BytesIO(raw)) as zf:
@@ -129,44 +151,46 @@ async def process_image(file: UploadFile = File(...), dev: bool = True):
                     for info in infos:
                         try:
                             data = zf.read(info.filename)
-                            ds = pydicom.dcmread(BytesIO(data), stop_before_pixels=True, force=True)
-                            # try to extract StudyInstanceUID / SeriesInstanceUID if present
-                            if not study_uid and hasattr(ds, "StudyInstanceUID"):
-                                study_uid = str(ds.StudyInstanceUID)
-                            if not series_uid and hasattr(ds, "SeriesInstanceUID"):
-                                series_uid = str(ds.SeriesInstanceUID)
-                            # break when at least study found
-                            if study_uid and series_uid:
-                                break
+                            if not _is_probable_dicom(data):
+                                continue
+                            dicom_candidates.append((info.filename, data))
                         except Exception:
                             continue
-                    path_to_study = "uploaded_zip"
             else:
-                # not a zip — try read as single DICOM
-                try:
-                    ds = pydicom.dcmread(BytesIO(raw), stop_before_pixels=True, force=True)
-                    if hasattr(ds, "StudyInstanceUID"):
-                        study_uid = str(ds.StudyInstanceUID)
-                    if hasattr(ds, "SeriesInstanceUID"):
-                        series_uid = str(ds.SeriesInstanceUID)
-                    path_to_study = "single_dicom"
-                except Exception:
-                    path_to_study = "unknown"
+                # single file — treat as a candidate if it looks like DICOM
+                if _is_probable_dicom(raw):
+                    dicom_candidates.append(("uploaded_file", raw))
         except Exception:
-            # ignore extraction failure, keep defaults
+            # ignore extraction failures
             pass
 
-        # here put your real model inference logic to compute probability/pathology
-        # for example we just fill with demo logic:
-        probability = 0.42
-        pathology_flag = 0
-        processing_status = "Success"
-        time_of_processing = round(time.time() - t0, 2)
+        # Call the model connector with the list of (filename, bytes)
+        try:
+            model_result: Dict[str, Any] = ConnectingLinkWithModel(dicom_candidates)
+            # expected keys: path_to_study, study_uid, series_uid, probability_of_pathology, pathology, model_processing_time
+            probability = float(model_result.get("probability_of_pathology", 0.0))
+            pathology_flag = int(model_result.get("pathology", 0))
+            path_to_study = str(model_result.get("path_to_study", "unknown"))
+            study_uid = str(model_result.get("study_uid", "unknown"))
+            series_uid = str(model_result.get("series_uid", "unknown"))
+            model_time = float(model_result.get("model_processing_time", 0.0))
+            processing_status = "Success"
+        except Exception as ex:
+            # model failed — fill defaults
+            probability = 0.0
+            pathology_flag = 0
+            path_to_study = "unknown"
+            study_uid = "unknown"
+            series_uid = "unknown"
+            model_time = 0.0
+            processing_status = f"ModelFailure: {str(ex)}"
+
+        time_of_processing = round(time.time() - t0 + float(model_time), 3)
 
         response_obj = OutputData(
             path_to_study=path_to_study,
-            study_uid=study_uid or "unknown",
-            series_uid=series_uid or "unknown",
+            study_uid=study_uid,
+            series_uid=series_uid,
             probability_of_pathology=probability,
             pathology=pathology_flag,
             processing_status=processing_status,
@@ -184,119 +208,6 @@ async def process_image(file: UploadFile = File(...), dev: bool = True):
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(content={"processing_status": "Failure", "error": str(e)}, status_code=500)
-
-
-@app.post("/viewer")
-async def viewer(file: UploadFile = File(...)):
-    """
-    Возвращает JSON {"frames": ["data:image/png;base64,...", ...]}
-    Обрабатывает DICOM-файлы внутри ZIP, поддерживает одиночные и многокадровые DICOM.
-    """
-    try:
-        contents = await file.read()
-        with zipfile.ZipFile(BytesIO(contents)) as zf:
-            infolist = [info for info in zf.infolist() if not info.is_dir()]
-
-            if not infolist:
-                return JSONResponse(content={"frames": []})
-
-            candidates: List[Tuple[Any, bytes, str]] = []  # (sort_key, raw_bytes, name)
-
-            for info in infolist:
-                try:
-                    data = zf.read(info.filename)
-                    ds_head = pydicom.dcmread(BytesIO(data), stop_before_pixels=True, force=True)
-                    key = None
-                    if hasattr(ds_head, "InstanceNumber"):
-                        try:
-                            key = int(ds_head.InstanceNumber)
-                        except Exception:
-                            key = None
-                    if key is None and hasattr(ds_head, "SliceLocation"):
-                        try:
-                            key = float(ds_head.SliceLocation)
-                        except Exception:
-                            key = None
-                    if key is None and hasattr(ds_head, "ImagePositionPatient"):
-                        ip = ds_head.ImagePositionPatient
-                        try:
-                            key = float(ip[2])
-                        except Exception:
-                            key = None
-                    candidates.append((key, data, info.filename))
-                except Exception:
-                    continue
-
-            if not candidates:
-                return JSONResponse(content={"frames": []})
-
-            def _sort_key(item):
-                k, _, name = item
-                return (0, 0) if k is None else (1, k)
-
-            candidates_sorted = sorted(candidates, key=_sort_key)
-
-            frames: List[str] = []
-            max_frames = 300
-            for key, raw_bytes, name in candidates_sorted:
-                if len(frames) >= max_frames:
-                    break
-                try:
-                    ds = pydicom.dcmread(BytesIO(raw_bytes), force=True)
-                    if not hasattr(ds, "PixelData"):
-                        continue
-                    arr = ds.pixel_array
-                    if arr is None:
-                        continue
-
-                    if arr.ndim == 3:
-                        # (frames, rows, cols) or (rows, cols, channels)
-                        if arr.shape[0] > 1 and arr.shape[1] > 10:
-                            # multiline frames
-                            for i in range(arr.shape[0]):
-                                if len(frames) >= max_frames:
-                                    break
-                                img = arr[i]
-                                if img.ndim == 3 and img.shape[2] > 1:
-                                    img2 = img[:, :, 0]
-                                else:
-                                    img2 = img
-                                img_u8 = _normalize_to_uint8(img2)
-                                ok, buf = cv2.imencode(".png", img_u8)
-                                if ok:
-                                    b64 = base64.b64encode(buf.tobytes()).decode("ascii")
-                                    frames.append("data:image/png;base64," + b64)
-                        else:
-                            img = arr[:, :, 0] if arr.shape[2] > 1 else arr
-                            img_u8 = _normalize_to_uint8(img)
-                            ok, buf = cv2.imencode(".png", img_u8)
-                            if ok:
-                                b64 = base64.b64encode(buf.tobytes()).decode("ascii")
-                                frames.append("data:image/png;base64," + b64)
-                    elif arr.ndim == 2:
-                        img_u8 = _normalize_to_uint8(arr)
-                        ok, buf = cv2.imencode(".png", img_u8)
-                        if ok:
-                            b64 = base64.b64encode(buf.tobytes()).decode("ascii")
-                            frames.append("data:image/png;base64," + b64)
-                    else:
-                        try:
-                            img = np.squeeze(arr)
-                            if img.ndim == 2:
-                                img_u8 = _normalize_to_uint8(img)
-                                ok, buf = cv2.imencode(".png", img_u8)
-                                if ok:
-                                    b64 = base64.b64encode(buf.tobytes()).decode("ascii")
-                                    frames.append("data:image/png;base64," + b64)
-                        except Exception:
-                            continue
-                except Exception:
-                    continue
-
-            return JSONResponse(content={"frames": frames})
-    except Exception as e:
-        traceback.print_exc()
-        return JSONResponse(content={"error": f"Viewer processing failed: {str(e)}"}, status_code=500)
 
 
 if __name__ == "__main__":
