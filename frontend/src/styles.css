@@ -979,3 +979,87 @@ html,body,#root { height: 100%; margin: 0; background: var(--bg); }
   .skeleton-badge { width: 64px; height: 24px; }
   .skeleton-download { height: 44px; }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* UIDField styles */
+.uid-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0; /* важно для корректного flex truncation inside .row-value */
+}
+
+.uid-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+  font-size: 13px;
+  color: #0f172a;
+  /* allow wrapping at inserted zero-width spaces (and generally anywhere if needed) */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  flex: 1 1 auto;
+  line-height: 1.25;
+  word-spacing: normal;
+  hyphens: none;
+  /* ensure it doesn't force parent to grow */
+  min-width: 0;
+}
+
+/* copy button */
+.uid-copy-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(2,6,23,0.05);
+  background: transparent;
+  color: #0f172a;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  width: 36px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .12s ease, transform .06s ease;
+}
+.uid-copy-btn:hover:not(:disabled) {
+  background: rgba(2,6,23,0.04);
+  transform: translateY(-1px);
+}
+.uid-copy-btn:active {
+  transform: translateY(0);
+}
+.uid-copy-btn[aria-label="Скопировано"] {
+  background: rgba(6,214,160,0.08);
+  color: #047857;
+}
+
+/* ensure row-value won't overflow layout */
+.row-value {
+  flex: 1;
+  color: #0f172a;
+  font-size: 14px;
+  word-break: break-word;
+  min-width: 0; /* VERY IMPORTANT: allow flex children to shrink */
+}
