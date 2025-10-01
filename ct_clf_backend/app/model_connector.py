@@ -2,12 +2,8 @@
 import time
 from typing import List, Tuple, Dict, Any
 from io import BytesIO
+import pydicom
 
-# опционально: pydicom для чтения заголовков
-try:
-    import pydicom
-except Exception:
-    pydicom = None  # если в окружении нет pydicom — реализация вернёт "unknown" для UID'ов
 
 def ConnectingLinkWithModel(dicom_files: List[Tuple[str, bytes]]) -> Dict[str, Any]:
     """
