@@ -1,43 +1,29 @@
-from torchvision.models.densenet import densenet121
-from torchvision.models.inception import inception_v3
-from torchvision.models.resnet import resnet50
-from torchvision.models.convnext import convnext_tiny
-
-from torchvision.transforms import Resize, ToTensor, Normalize, Compose
-from torch.utils.data import DataLoader, Dataset
-from torch import nn, optim, cuda, amp, max
-from torch import save as model_save
-import torch
-
-from tqdm import tqdm
-from numpy import ndarray
+"""
+Модуль для создания, обучения, сохранения и загрузки сверточных нейронных сетей.
+Архитектуры: ResNet50, DenseNet121, Inception_V3, ConvNeXt_Tiny.
+"""
 
 import warnings
 from pathlib import Path
-
 from typing import Optional
 
+import numpy as np
+import torch
+from PIL import Image
+from numpy import ndarray
+from torch import nn, optim, cuda, amp
+from torch import save as model_save
+from torch.utils.data import DataLoader
+from torchvision.models.convnext import convnext_tiny
+from torchvision.models.densenet import densenet121
+from torchvision.models.inception import inception_v3
+from torchvision.models.resnet import resnet50
+from torchvision.transforms import Resize, ToTensor, Normalize, Compose
+from tqdm import tqdm
+
+from ct_clf_hack.shared.data_utils import CTDataset, convert_to_rgb
+
 warnings.filterwarnings("ignore", category=FutureWarning)
-
-
-class CTDataset(Dataset):
-    def __init__(self, images, labels=None, transform=None):
-        self.images = images
-        self.labels = labels
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, idx):
-        image = self.images[idx]
-        if self.transform:
-            image = self.transform(image)
-        if self.labels is not None:
-            label = self.labels[idx]
-            return image, label
-        return image
-
 
 class ModelCNN:
     __INPUT_SIZE = {
@@ -53,57 +39,32 @@ class ModelCNN:
         "ConvNeXt_Tiny": convnext_tiny
     }
 
-    def __init__(self, model_name: str, num_classes: int = 2, device: Optional[str] = None):
+    def __init__(self, model_name: str, num_classes: int = 2, device: Optional[torch.device] = None):
+        """
+        CNN модель с возможностью обучения, сохранения и загрузки.
+        Args:
+            model_name (str): Название архитектуры модели. Поддерживаемые: "ResNet50", "DenseNet121", "Inception_V3", "ConvNeXt_Tiny".
+            num_classes (int): Количество классов для классификации.
+            device (torch.device, optional): Устройство для вычислений (CPU или GPU). По умолчанию выбирается автоматически.
+        """
         if model_name not in ModelCNN.__ARCHITECTURE:
             raise Exception('There is no such model architecture.')
 
         self.model_name = model_name
         self.num_classes = num_classes
 
-        if device is None:
-            self.device = "cuda" if cuda.is_available() else "cpu"
-        else:
-            self.device = device
+        self.device = device
 
         self.transforms = Compose([
             Resize(ModelCNN.__INPUT_SIZE[self.model_name]),
             ToTensor(),
-            Normalize(mean=[0.485], std=[0.229])
+            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         self.init_model()
 
-    def change_first_layer(self, model):
-        if self.model_name == "ResNet50":
-            model.conv1 = nn.Conv2d(1, model.conv1.out_channels, kernel_size=model.conv1.kernel_size,
-                                    stride=model.conv1.stride, padding=model.conv1.padding,
-                                    bias=model.conv1.bias is not None)
-        elif self.model_name == "DenseNet121":
-            model.features.conv0 = nn.Conv2d(1, model.features.conv0.out_channels,
-                                             kernel_size=model.features.conv0.kernel_size,
-                                             stride=model.features.conv0.stride, padding=model.features.conv0.padding,
-                                             bias=model.features.conv0.bias is not None)
-        elif self.model_name == "Inception_V3":
-            model.Conv2d_1a_3x3.conv = nn.Conv2d(1, model.Conv2d_1a_3x3.conv.out_channels,
-                                                 kernel_size=model.Conv2d_1a_3x3.conv.kernel_size,
-                                                 stride=model.Conv2d_1a_3x3.conv.stride,
-                                                 padding=model.Conv2d_1a_3x3.conv.padding,
-                                                 bias=model.Conv2d_1a_3x3.conv.bias is not None)
-        elif self.model_name == "ConvNeXt_Tiny":
-            original_conv = model.features[0][0]
-            model.features[0][0] = nn.Conv2d(
-                in_channels=1,
-                out_channels=original_conv.out_channels,
-                kernel_size=original_conv.kernel_size,
-                stride=original_conv.stride,
-                padding=original_conv.padding,
-                bias=original_conv.bias is not None
-            )
-        return model
-
     def init_model(self):
         architecture = ModelCNN.__ARCHITECTURE[self.model_name]
-        self.model = architecture(weights=None)
-        self.model = self.change_first_layer(self.model)
+        self.model = architecture(weights='IMAGENET1K_V1')
 
         if self.model_name == "ResNet50":
             num_features = self.model.fc.in_features
@@ -130,11 +91,24 @@ class ModelCNN:
         self.criterion.to(self.device)
 
     def load_data(self, images: list[ndarray], labels: list[int]):
-        dataset = CTDataset(images, labels, transform=self.transforms)
+        """
+        Загружает данные и создает DataLoader (только для обучения).
+        Args:
+            images (list[ndarray]): Список изображений.
+            labels (list[int]): Список меток классов.
+        """
+        rgb_images = [convert_to_rgb(img) for img in images]
+
+        dataset = CTDataset(rgb_images, labels, transform=self.transforms)
         self.dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
         return dataset
 
     def train(self, epochs: int = 10):
+        """
+        Обучает модель на загруженных данных.
+        Args:
+            epochs (int): Количество эпох для обучения.
+        """
         use_amp = self.device == "cuda"
         scaler = amp.GradScaler() if use_amp else None
 
@@ -168,7 +142,7 @@ class ModelCNN:
                     self.optimizer.step()
 
                 running_loss += loss.item() * images.size(0)
-                _, predicted = max(outputs, 1)
+                _, predicted = torch.max(outputs, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
@@ -181,14 +155,20 @@ class ModelCNN:
 
             print(f"Epoch {epoch + 1}/{epochs} | Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc:.4f}")
 
-    def save(self, dpath: Optional[str] = None):
+    def save(self, spath: Optional[str] = None):
+        """
+        Сохраняет модель на диск.
+        Args:
+            spath (str, optional): Путь для сохранения модели. Если None, сохраняется в 'trained_<model_name>.pth'.
+        """
         model_state = self.model.module.state_dict() if isinstance(self.model,
                                                                    nn.DataParallel) else self.model.state_dict()
-        if dpath:
-            save_path = str(Path(dpath) / f'trained_{self.model_name}.pth')
+        if spath:
+            spath = Path(spath)
+            model_save(model_state, spath)
         else:
             save_path = f'trained_{self.model_name}.pth'
-        model_save(model_state, save_path)
+            model_save(model_state, save_path)
 
     def load(self, model_path: str):
         model_path = Path(model_path)
@@ -228,8 +208,20 @@ class ModelCNN:
         self.model.eval()
         print(f"Model loaded from {model_path}")
 
-    def predict(self, images: list[ndarray], batch_size: int = 32) -> list[int]:
-        dataset = CTDataset(images, transform=self.transforms)
+    def predict_proba(self, images: list[ndarray], batch_size: int = 32) -> np.ndarray:
+        """
+        Предсказывает вероятности классов для заданных изображений.
+        Args:
+            images (list[ndarray]): Список изображений.
+            batch_size (int): Размер батча для предсказания.
+        Returns:
+            np.ndarray: Массив вероятностей классов.
+        """
+        rgb_images = [convert_to_rgb(img) for img in images]
+        if isinstance(rgb_images[0], np.ndarray):
+            rgb_images = [Image.fromarray(img.astype(np.uint8)) for img in rgb_images]
+
+        dataset = CTDataset(rgb_images, transform=self.transforms)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
         self.model.eval()
@@ -240,6 +232,87 @@ class ModelCNN:
                 outputs = self.model(batch)
                 if self.model_name == "Inception_V3" and self.model.training:
                     outputs = outputs.logits
-                preds = torch.argmax(outputs, dim=1).cpu().numpy()
-                all_preds.extend(preds)
-        return all_preds
+                all_preds.extend(torch.softmax(outputs, dim=1).cpu().numpy())
+        return np.array(all_preds)
+
+    def predict(self, images: list[ndarray], batch_size: int = 32) -> np.ndarray:
+        """
+        Предсказывает классы для заданных изображений.
+        Args:
+            images (list[ndarray]): Список изображений.
+            batch_size (int): Размер батча для предсказания.
+        Returns:
+            np.ndarray: Массив предсказанных классов.
+        """
+        proba = self.predict_proba(images, batch_size)
+        return np.argmax(proba, axis=1)
+
+
+class ConvSensus:
+    def __init__(self, models_config: dict, device: Optional[torch.device] = None):
+        """
+         Ансамбль из нескольких моделей CNN для улучшения качества предсказаний.
+         Args:
+             models_config (dict): Конфигурация моделей с архитектурами и путями к
+                                     сохраненным весам.
+             device (torch.device, optional): Устройство для вычислений (CPU или GPU). По умолчанию выбирается автоматически.
+         """
+        self.models = []
+        for arch, cfg in models_config.items():
+            checkpoints_path = cfg.get("local", None)
+            if not checkpoints_path or not Path(checkpoints_path).exists():
+                print(f"Warning: Checkpoint for {arch} not found at {checkpoints_path}, skipping.")
+                continue
+            model = ModelCNN(arch, device=device)
+            model.load(checkpoints_path)
+            self.models.append(model)
+
+    def predict_proba(self, images: list[ndarray], batch_size: int = 32) -> np.ndarray:
+        """
+        Предсказывает усредненные вероятности классов от всех моделей ансамбля.
+        Args:
+            images (list[ndarray]): Список изображений.
+            batch_size (int): Размер батча для предсказания.
+        Returns:
+            np.ndarray: Массив усредненных вероятностей классов.
+        """
+        if not self.models:
+            raise Exception("No models loaded in the ensemble.")
+
+        all_probas = []
+        for model in self.models:
+            proba = model.predict_proba(images, batch_size)
+            all_probas.append(proba)
+
+        avg_proba = np.mean(all_probas, axis=0)
+        return avg_proba
+
+    def predict(self, images: list[ndarray], batch_size: int = 32) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Предсказывает классы и вероятности для заданных изображений.
+        Args:
+            images (list[ndarray]): Список изображений.
+            batch_size (int): Размер батча для предсказания.
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Кортеж из массива вероятностей и массива предсказанных классов.
+        """
+        proba = self.predict_proba(images, batch_size)
+        return proba, np.argmax(proba, axis=1)
+
+
+def check_checkpoints(models_cfg: dict) -> bool:
+    """
+    Проверяет наличие всех контрольных точек моделей.
+    Args:
+        models_cfg (dict): Конфигурация моделей с архитектурами и путями к
+                             сохраненным весам.
+    Returns:
+        bool: True, если все контрольные точки существуют, иначе False.
+    """
+    all_exist = True
+    for arch, cfg in models_cfg.items():
+        checkpoints_path = cfg.get("local", None)
+        if not checkpoints_path or not Path(checkpoints_path).exists():
+            print(f"Warning: Checkpoint for {arch} not found at {checkpoints_path}.")
+            all_exist = False
+    return all_exist

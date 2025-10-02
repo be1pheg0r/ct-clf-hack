@@ -2,7 +2,8 @@ from ct_clf_hack.shared.path_utils import configs_dpath
 import yaml
 
 _configs_names = {
-    "models": "models.yaml"
+    "models": "models.yaml",
+    "class_map": "class_map.yaml"
 }
 
 def open_config(config_name: str) -> dict:
@@ -20,3 +21,6 @@ def open_config(config_name: str) -> dict:
 
 def models_config() -> dict:
     return open_config("models")
+
+def class_map_config() -> dict:
+    return open_config("class_map")

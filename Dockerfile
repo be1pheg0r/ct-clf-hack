@@ -1,0 +1,136 @@
+# Multi-stage Dockerfile for both backend and frontend
+
+# Stage 1: Backend builder
+FROM python:3.11-slim as backend-builder
+
+WORKDIR /app
+
+# Install system dependencies for backend
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install poetry
+RUN pip install poetry
+
+# Copy backend dependency files
+COPY pyproject.toml poetry.lock ./
+
+# Configure poetry and install dependencies
+RUN poetry config virtualenvs.create true && \
+    poetry config virtualenvs.in-project true && \
+    poetry install --no-dev --no-root
+
+# Stage 2: Frontend builder
+FROM node:18-slim as frontend-builder
+
+WORKDIR /app/frontend
+
+# Copy frontend dependency files
+COPY frontend/package*.json ./
+
+# Install frontend dependencies
+RUN npm ci --only=production
+
+# Copy frontend source code
+COPY frontend/ ./
+
+# Build frontend
+RUN npm run build
+
+# Stage 3: Backend runtime
+FROM python:3.11-slim as backend
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+WORKDIR /app
+
+# Install system runtime dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy backend virtual environment from builder
+COPY --from=backend-builder --chown=appuser:appuser /app/.venv /app/.venv
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Copy backend application code
+COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
+COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
+COPY --chown=appuser:appuser configs ./configs
+COPY --chown=appuser:appuser checkpoints ./checkpoints
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/cache && \
+    chown -R appuser:appuser /app/data /app/logs /app/cache
+
+USER appuser
+
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+EXPOSE 8000
+
+CMD ["uvicorn", "ct_clf_backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Stage 4: Frontend runtime (nginx)
+FROM nginx:alpine as frontend
+
+# Copy built frontend from builder
+COPY --from=frontend-builder /app/frontend/build /usr/share/nginx/html
+
+# Copy custom nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+
+# Stage 5: Full application (both backend and frontend)
+FROM python:3.11-slim as fullstack
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    nginx \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+WORKDIR /app
+
+# Copy backend from backend stage
+COPY --from=backend-builder --chown=appuser:appuser /app/.venv /app/.venv
+COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
+COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
+COPY --chown=appuser:appuser configs ./configs
+COPY --chown=appuser:appuser checkpoints ./checkpoints
+
+# Copy built frontend from frontend builder
+COPY --from=frontend-builder /app/frontend/build /usr/share/nginx/html
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/cache && \
+    chown -R appuser:appuser /app/data /app/logs /app/cache
+
+# Copy supervisor configuration
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY nginx-fullstack.conf /etc/nginx/nginx.conf
+
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 80 8000
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
