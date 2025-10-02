@@ -26,7 +26,6 @@ make docker-up
 make docker-up-fullstack
 
 # Приложение будет доступно по адресу: http://localhost
-# API доступно через: http://localhost/api/
 ```
 
 ## Полезные команды
