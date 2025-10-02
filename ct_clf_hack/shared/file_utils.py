@@ -63,6 +63,7 @@ def iterate_dicom_nii_slices(
     base_dirs = [Path(d) for d in base_dirs]
 
     all_file_paths = []
+
     for base_dir in base_dirs:
         base_dir = Path(base_dir)
         for class_folder, label in class_map.items():

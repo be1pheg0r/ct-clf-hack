@@ -1,21 +1,20 @@
+import warnings
+from pathlib import Path
+from typing import Optional, Union
+
+import numpy as np
+import torch
+from torch import amp, cuda, nn, optim
+from torch import save as model_save
+from torch.utils.data import DataLoader, Dataset
+from torchvision.models.convnext import convnext_tiny
 from torchvision.models.densenet import densenet121
 from torchvision.models.inception import inception_v3
 from torchvision.models.resnet import resnet50
-from torchvision.models.convnext import convnext_tiny
-
-from torchvision.transforms import Resize, ToTensor, Normalize, Compose
-from torch.utils.data import DataLoader, Dataset
-from torch import nn, optim, cuda, amp, max
-from torch import save as model_save
-import torch
-
+from torchvision.transforms import Compose, Normalize, Resize, ToTensor
 from tqdm import tqdm
-from numpy import ndarray
 
-import warnings
-from pathlib import Path
-
-from typing import Optional
+from ct_clf_hack.shared.logger_utils import default_logger
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -148,7 +147,7 @@ class ModelCNN:
                     self.optimizer.step()
 
                 running_loss += loss.item() * images.size(0)
-                _, predicted = max(outputs, 1)
+                _, predicted = torch.max(outputs, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
@@ -205,19 +204,100 @@ class ModelCNN:
         self.model.eval()
         print(f"Model loaded from {model_path}")
 
-    def predict(self, dataset: Dataset, batch_size: int = 32) -> list[int]:
+    def predict_proba(self, dataset: Dataset, batch_size: int = 32) -> list[int]:
         """Predict using dataset"""
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
         self.model.eval()
-        all_preds = []
+        all_probs = []
         with torch.no_grad():
             for batch, _ in tqdm(dataloader, desc="Predicting"):
                 batch = batch.to(self.device).float()
                 outputs = self.model(batch)
                 if self.model_name == "Inception_V3" and self.model.training:
                     outputs = outputs.logits
-                preds = torch.argmax(outputs, dim=1).cpu().numpy()
-                all_preds.extend(preds)
-        return all_preds
+                # Применяем softmax для получения вероятностей
+                probs = torch.nn.functional.softmax(outputs, dim=1)
+                all_probs.extend(probs.cpu().numpy())
+        return all_probs
 
+    def predict(self, dataset: Dataset, batch_size: int = 32) -> list[int]:
+        probs = self.predict_proba(dataset, batch_size)
+        preds = [int(np.argmax(p)) for p in probs]
+        return preds
+
+    def predict_batch(self, batch: torch.Tensor) -> torch.Tensor:
+        self.model.eval()
+        with torch.no_grad():
+            batch = batch.to(self.device).float()
+            if batch.ndim == 3:
+                batch = batch.unsqueeze(1)
+            outputs = self.model(batch)
+            if self.model_name == "Inception_V3" and self.model.training:
+                outputs = outputs.logits
+            # Применяем softmax для получения вероятностей
+            probs = torch.nn.functional.softmax(outputs, dim=1)
+        return probs.cpu()
+
+
+class CNNLoader:
+    def __init__(self, models_config: dict[str, str], num_classes: Union[int, str] = "auto",
+                 device: Optional[torch.device] = torch.device("cpu")) -> None:
+        self.models_config = models_config
+        self.num_classes = num_classes
+        self.device = device
+        self.models = self.load_models()
+
+        if self.num_classes == "auto":
+            self.num_classes = max(model.num_classes for model in self.models)
+            default_logger.info(f"Auto-detected number of classes: {self.num_classes}")
+
+
+    def load_models(self) -> list[ModelCNN]:
+        models = []
+        for arch, path in self.models_config.items():
+            model = ModelCNN(arch, device=self.device)
+            model.load(path)
+            models.append(model)
+        return models
+
+
+class ConvSensus:
+    def __init__(self, models: list[ModelCNN], num_classes: int = 2,
+                 device: Optional[torch.device] = torch.device("cpu")) -> None:
+        self.models = models
+        self.num_classes = num_classes
+        self.device = device
+
+        for model in self.models:
+            model.model.to(self.device)
+            model.model.eval()
+
+
+
+    def predict_proba(self, dataset: Dataset, batch_size: int = 32, labels: bool = True) -> list[int]:
+
+        all_probs = []
+        if not labels:
+            dataset.labels = [0] * len(dataset)
+        with torch.no_grad():
+            for batch, _ in tqdm(dataset, desc="Predicting with ConvSensus"):
+                batch = batch.to(self.device).float()
+                if batch.ndim == 3:
+                    batch = batch.unsqueeze(1)
+
+                ensemble_outputs = torch.zeros((batch.size(0), self.num_classes), device=self.device)
+
+                for model in self.models:
+                    outputs = model.predict_batch(batch)
+                    ensemble_outputs += torch.tensor(outputs, device=self.device)
+
+                ensemble_outputs /= len(self.models)
+                all_probs.extend(ensemble_outputs.cpu().numpy())
+
+        return all_probs
+
+    def predict(self, dataset: Dataset, batch_size: int = 32, labels: bool = True) -> list[int]:
+        probs = self.predict_proba(dataset, batch_size, labels)
+        preds = [int(np.argmax(p)) for p in probs]
+        return preds
