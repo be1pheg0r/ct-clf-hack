@@ -24,35 +24,14 @@ RUN poetry config virtualenvs.create true && \
     poetry lock && \
     poetry install --only main --no-root
 
+# Copy model download script
+COPY scripts/download_models.py ./scripts/
+
 # Download models from Huggingface
 RUN mkdir -p /app/checkpoints && \
-    python -c "
-import os
-os.environ['HF_HOME'] = '/app/checkpoints'
-try:
-    from transformers import AutoModel, AutoTokenizer
-    from huggingface_hub import hf_hub_download
-
-    # Download common models (adjust model names as needed)
-    models = [
-        'microsoft/resnet-50',
-        'google/vit-base-patch16-224',
-        'facebook/convnext-base-224-22k',
-    ]
-
-    for model_name in models:
-        try:
-            print(f'Downloading {model_name}...')
-            AutoModel.from_pretrained(model_name, cache_dir='/app/checkpoints')
-            print(f'Successfully downloaded {model_name}')
-        except Exception as e:
-            print(f'Failed to download {model_name}: {e}')
-
-except ImportError:
-    print('Transformers not available, skipping model downloads')
-except Exception as e:
-    print(f'Error downloading models: {e}')
-"
+    export HF_HOME="/app/checkpoints" && \
+    export TRANSFORMERS_CACHE="/app/checkpoints" && \
+    python scripts/download_models.py --cache-dir /app/checkpoints || echo "Model download failed, continuing..."
 
 # Stage 2: Frontend builder
 FROM node:18-slim AS frontend-builder

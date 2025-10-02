@@ -7,12 +7,11 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any
 
-def download_models(models_config: Dict[str, Any], cache_dir: str = "./checkpoints") -> None:
+def download_models(cache_dir: str = "./checkpoints") -> None:
     """
     Загружает модели с Huggingface Hub.
 
     Args:
-        models_config: Конфигурация моделей
         cache_dir: Директория для кэша моделей
     """
     try:
@@ -21,7 +20,7 @@ def download_models(models_config: Dict[str, Any], cache_dir: str = "./checkpoin
     except ImportError:
         print("ERROR: transformers или huggingface_hub не установлены")
         print("Установите: pip install transformers huggingface_hub")
-        sys.exit(1)
+        return
 
     # Создаем директорию для моделей
     cache_path = Path(cache_dir)
@@ -39,7 +38,6 @@ def download_models(models_config: Dict[str, Any], cache_dir: str = "./checkpoin
         "google/vit-base-patch16-224",
         "facebook/convnext-base-224-22k",
         "microsoft/swin-base-patch4-window7-224",
-        "nvidia/mit-b0"
     ]
 
     successful_downloads = 0
@@ -49,22 +47,12 @@ def download_models(models_config: Dict[str, Any], cache_dir: str = "./checkpoin
         try:
             print(f"Загрузка {model_name}...")
 
-            # Загружаем модель и токенайзер
+            # Загружаем модель
             model = AutoModel.from_pretrained(
                 model_name,
                 cache_dir=cache_dir,
                 trust_remote_code=True
             )
-
-            try:
-                tokenizer = AutoTokenizer.from_pretrained(
-                    model_name,
-                    cache_dir=cache_dir,
-                    trust_remote_code=True
-                )
-            except:
-                # Не все модели имеют токенайзер
-                pass
 
             print(f"✓ Успешно загружен {model_name}")
             successful_downloads += 1
@@ -76,10 +64,6 @@ def download_models(models_config: Dict[str, Any], cache_dir: str = "./checkpoin
     print(f"\nРезультат загрузки:")
     print(f"Успешно: {successful_downloads}")
     print(f"Ошибок: {failed_downloads}")
-
-    if failed_downloads > 0:
-        print("\nНекоторые модели не удалось загрузить.")
-        print("Проверьте интернет-соединение и доступность моделей.")
 
 def main():
     """Основная функция."""
@@ -94,18 +78,7 @@ def main():
     )
 
     args = parser.parse_args()
-
-    # Загружаем конфигурацию моделей
-    try:
-        sys.path.append(str(Path(__file__).parent.parent))
-        from ct_clf_hack.shared.config_utils import models_config
-        config = models_config()
-    except Exception as e:
-        print(f"Не удалось загрузить конфигурацию: {e}")
-        config = {}
-
-    download_models(config, args.cache_dir)
+    download_models(args.cache_dir)
 
 if __name__ == "__main__":
     main()
-
