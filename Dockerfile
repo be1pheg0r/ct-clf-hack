@@ -9,6 +9,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install poetry
@@ -18,9 +19,11 @@ RUN pip install poetry
 COPY pyproject.toml poetry.lock ./
 
 # Configure poetry and install dependencies
-RUN poetry config virtualenvs.create true && \
-    poetry config virtualenvs.in-project true && \
-    poetry install --no-dev --no-root
+ENV POETRY_NO_INTERACTION=1 \
+    POETRY_VENV_IN_PROJECT=1 \
+    POETRY_CACHE_DIR=/tmp/poetry_cache
+
+RUN poetry install --only=main && rm -rf $POETRY_CACHE_DIR
 
 # Stage 2: Frontend builder
 FROM node:18-slim as frontend-builder
@@ -50,6 +53,7 @@ WORKDIR /app
 # Install system runtime dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy backend virtual environment from builder
@@ -60,8 +64,10 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Copy backend application code
 COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
 COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
-COPY --chown=appuser:appuser configs ./configs
-COPY --chown=appuser:appuser checkpoints ./checkpoints
+
+# Clone models before switching to non-root user
+RUN git clone "https://huggingface.co/be1pheg0r/ct_clf_models" "checkpoints/" && \
+    chown -R appuser:appuser checkpoints/
 
 # Create necessary directories
 RUN mkdir -p /app/data /app/logs /app/cache && \
@@ -101,6 +107,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     nginx \
     supervisor \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -109,20 +116,22 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 WORKDIR /app
 
 # Copy backend from backend stage
-COPY --from=backend-builder --chown=appuser:appuser /app/.venv /app/.venv
-COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
-COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
-COPY --chown=appuser:appuser configs ./configs
-COPY --chown=appuser:appuser checkpoints ./checkpoints
+COPY --from=backend-builder /app/.venv /app/.venv
+COPY ct_clf_backend ./ct_clf_backend
+COPY ct_clf_hack ./ct_clf_hack
+
+# Clone models
+RUN git clone "https://huggingface.co/be1pheg0r/ct_clf_models" "checkpoints/" && \
+    chown -R appuser:appuser checkpoints/
 
 # Copy built frontend from frontend builder
 COPY --from=frontend-builder /app/frontend/build /usr/share/nginx/html
 
 # Create necessary directories
 RUN mkdir -p /app/data /app/logs /app/cache && \
-    chown -R appuser:appuser /app/data /app/logs /app/cache
+    chown -R appuser:appuser /app/data /app/logs /app/cache /app/ct_clf_backend /app/ct_clf_hack
 
-# Copy supervisor configuration
+# Copy configuration files
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY nginx-fullstack.conf /etc/nginx/nginx.conf
 
@@ -131,6 +140,10 @@ ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-EXPOSE 80 8000
+EXPOSE 80
+
+# Health check for fullstack
+HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost/health && curl -f http://localhost:8000/health || exit 1
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
