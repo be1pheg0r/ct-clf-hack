@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for both backend and frontend
 
 # Stage 1: Backend builder
-FROM python:3.11-slim as backend-builder
+FROM python:3.11-slim AS backend-builder
 
 WORKDIR /app
 
@@ -23,7 +23,7 @@ RUN poetry config virtualenvs.create true && \
     poetry install --no-dev --no-root
 
 # Stage 2: Frontend builder
-FROM node:18-slim as frontend-builder
+FROM node:18-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -40,7 +40,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 3: Backend runtime
-FROM python:3.11-slim as backend
+FROM python:3.11-slim AS backend
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -62,10 +62,9 @@ COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
 COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
 COPY --chown=appuser:appuser configs ./configs
 
-# Create checkpoints directory if it doesn't exist locally
+# Create checkpoints directory and copy if exists
 RUN mkdir -p /app/checkpoints
-COPY checkpoints* ./checkpoints/ 2>/dev/null || true
-RUN chown -R appuser:appuser /app/checkpoints
+COPY --chown=appuser:appuser checkpoints ./checkpoints 2>/dev/null || true
 
 # Create necessary directories
 RUN mkdir -p /app/data /app/logs /app/cache && \
@@ -85,7 +84,7 @@ EXPOSE 8000
 CMD ["uvicorn", "ct_clf_backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 # Stage 4: Frontend runtime (nginx)
-FROM nginx:alpine as frontend
+FROM nginx:alpine AS frontend
 
 # Copy built frontend from builder
 COPY --from=frontend-builder /app/frontend/build /usr/share/nginx/html
@@ -98,7 +97,7 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 
 # Stage 5: Full application (both backend and frontend)
-FROM python:3.11-slim as fullstack
+FROM python:3.11-slim AS fullstack
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -120,8 +119,7 @@ COPY --chown=appuser:appuser configs ./configs
 
 # Create and copy checkpoints directory
 RUN mkdir -p /app/checkpoints
-COPY checkpoints* ./checkpoints/ 2>/dev/null || true
-RUN chown -R appuser:appuser /app/checkpoints
+COPY --chown=appuser:appuser checkpoints ./checkpoints 2>/dev/null || true
 
 # Copy built frontend from frontend builder
 COPY --from=frontend-builder /app/frontend/build /usr/share/nginx/html
