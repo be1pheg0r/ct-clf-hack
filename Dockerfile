@@ -57,15 +57,14 @@ COPY --from=backend-builder --chown=appuser:appuser /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
 
+RUN mkdir -p /app/data /app/logs /app/cache app/checkpoints && \
+    chown -R appuser:appuser /app/data /app/logs /app/cache \
+
 # Copy backend application code
 COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
 COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
 COPY --chown=appuser:appuser configs ./configs
 COPY --chown=appuser:appuser checkpoints ./checkpoints
-
-# Create necessary directories
-RUN mkdir -p /app/data /app/logs /app/cache app/checkpoints && \
-    chown -R appuser:appuser /app/data /app/logs /app/cache
 
 USER appuser
 
