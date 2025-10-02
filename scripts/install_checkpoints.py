@@ -34,11 +34,6 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Install model checkpoints from Hugging Face Hub")
     p.add_argument("--checkpoints-dir", type=str, default="./checkpoints",
                    help="Directory where checkpoints are stored")
-    p.add_argument("--force", action="store_true", help="Overwrite existing checkpoints")
-    p.add_argument("--token", type=str, default=os.environ.get("HF_TOKEN") or os.environ.get("HF_HUB_TOKEN"),
-                   help="Hugging Face access token (or set HF_TOKEN env var)")
-    p.add_argument("--use-snapshot", action="store_true",
-                   help="Use snapshot_download (useful to mirror repo structure)")
     p.add_argument("--verbose", action="store_true", help="Verbose logging")
     return p.parse_args()
 
