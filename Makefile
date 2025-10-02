@@ -16,7 +16,7 @@ install-backend:
 	$(PYTHON) -m venv ./venv
 	. ./venv/bin/activate && pip install --upgrade pip
 	$(PYTHON) -m pip install poetry
-	poetry lock
+	poetry lock --no-update
 	poetry install
 	@echo "$(GREEN)Backend dependencies installed!$(NC)"
 
@@ -53,6 +53,8 @@ build-frontend:
 
 docker-build:
 	@echo "$(YELLOW)Building Docker image...$(NC)"
+	@echo "$(YELLOW)Generating poetry.lock if needed...$(NC)"
+	@if [ ! -f poetry.lock ]; then poetry lock --no-update; fi
 	docker build -t $(PROJECT_NAME) .
 	@echo "$(GREEN)Docker image built!$(NC)"
 
@@ -90,6 +92,8 @@ docker-logs:
 docker-rebuild:
 	@echo "$(YELLOW)Rebuilding and restarting services...$(NC)"
 	docker-compose down
+	@echo "$(YELLOW)Generating poetry.lock if needed...$(NC)"
+	@if [ ! -f poetry.lock ]; then poetry lock --no-update; fi
 	docker-compose build --no-cache
 	docker-compose up -d
 	@echo "$(GREEN)Services rebuilt and restarted!$(NC)"
