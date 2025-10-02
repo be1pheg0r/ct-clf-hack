@@ -37,11 +37,15 @@ RUN poetry config virtualenvs.create true && \
 # Copy model download script
 COPY scripts/download_models.py ./scripts/
 
-# Download models from Huggingface
+# Download models from Huggingface and create placeholder checkpoints
 RUN mkdir -p /app/checkpoints && \
     export HF_HOME="/app/checkpoints" && \
     export TRANSFORMERS_CACHE="/app/checkpoints" && \
-    python scripts/download_models.py --cache-dir /app/checkpoints || echo "Model download failed, continuing..."
+    python scripts/download_models.py --cache-dir /app/checkpoints || echo "Model download failed, continuing..." && \
+    touch /app/checkpoints/default_Inception_V3.pth && \
+    touch /app/checkpoints/default_ResNet50.pth && \
+    touch /app/checkpoints/default_DenseNet121.pth && \
+    touch /app/checkpoints/default_ConvNeXt_Tiny.pth
 
 # Stage 2: Frontend builder
 FROM node:18-slim AS frontend-builder
@@ -101,8 +105,12 @@ COPY --chown=appuser:appuser configs ./configs
 RUN touch /app/pyproject.toml /app/.project_root && \
     chown appuser:appuser /app/pyproject.toml /app/.project_root
 
-# Create checkpoints directory
+# Create checkpoints directory and placeholder files
 RUN mkdir -p /app/checkpoints && \
+    touch /app/checkpoints/default_Inception_V3.pth && \
+    touch /app/checkpoints/default_ResNet50.pth && \
+    touch /app/checkpoints/default_DenseNet121.pth && \
+    touch /app/checkpoints/default_ConvNeXt_Tiny.pth && \
     chown -R appuser:appuser /app/checkpoints
 
 # Create necessary directories
@@ -176,8 +184,12 @@ COPY --chown=appuser:appuser configs ./configs
 RUN touch /app/pyproject.toml /app/.project_root && \
     chown appuser:appuser /app/pyproject.toml /app/.project_root
 
-# Create checkpoints directory
+# Create checkpoints directory and placeholder files
 RUN mkdir -p /app/checkpoints && \
+    touch /app/checkpoints/default_Inception_V3.pth && \
+    touch /app/checkpoints/default_ResNet50.pth && \
+    touch /app/checkpoints/default_DenseNet121.pth && \
+    touch /app/checkpoints/default_ConvNeXt_Tiny.pth && \
     chown -R appuser:appuser /app/checkpoints
 
 # Copy built frontend from frontend builder

@@ -36,7 +36,11 @@ class OutputData(BaseModel):
     time_of_processing: float
 
 
-app = FastAPI()
+app = FastAPI(
+    title="CT Classification API",
+    description="API for CT scan classification and analysis",
+    version="1.0.0",
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -377,6 +381,16 @@ async def viewer(file: UploadFile = File(...)) -> JSONResponse:
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(content={"error": f"Viewer processing failed: {str(e)}"}, status_code=500)
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker health checks."""
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "service": "ct-clf-backend"
+    }
 
 
 if __name__ == "__main__":

@@ -56,7 +56,16 @@ build-frontend:
 	cd $(FRONTEND) && npm run build
 	@echo "$(GREEN)Frontend build complete!$(NC)"
 
-docker-build:
+create-checkpoints:
+	@echo "$(YELLOW)Creating checkpoint placeholders...$(NC)"
+	mkdir -p checkpoints
+	touch checkpoints/default_Inception_V3.pth
+	touch checkpoints/default_ResNet50.pth
+	touch checkpoints/default_DenseNet121.pth
+	touch checkpoints/default_ConvNeXt_Tiny.pth
+	@echo "$(GREEN)Checkpoint placeholders created!$(NC)"
+
+docker-build: create-checkpoints
 	@echo "$(YELLOW)Building Docker image...$(NC)"
 	docker build -t $(PROJECT_NAME) .
 	@echo "$(GREEN)Docker image built!$(NC)"
@@ -105,4 +114,4 @@ docker-clean:
 	docker system prune -f
 	@echo "$(GREEN)Docker cleanup complete!$(NC)"
 
-.PHONY: download-models docker-up docker-up-fullstack docker-down docker-logs docker-rebuild docker-clean
+.PHONY: create-checkpoints download-models docker-up docker-up-fullstack docker-down docker-logs docker-rebuild docker-clean
