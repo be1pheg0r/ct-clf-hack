@@ -39,9 +39,11 @@ COPY scripts/ ./scripts/
 COPY configs/ ./configs/
 COPY ct_clf_hack/ ./ct_clf_hack/
 
+ENV PYTHONPATH="/app"
+
 # Install model checkpoints using the dedicated script (with Poetry env)
 RUN mkdir -p /app/checkpoints && \
-    export PYTHONPATH="/app" && \
+    export PYTHONPATH && \
     poetry run python scripts/install_checkpoints.py --checkpoints-dir /app/checkpoints
 
 # Stage 2: Frontend builder
