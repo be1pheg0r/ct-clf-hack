@@ -20,9 +20,15 @@ install-backend:
 	poetry install
 	@echo "$(GREEN)Backend dependencies installed!$(NC)"
 
+install-checkpoints:
+	@echo "$(YELLOW)Installing model checkpoints...$(NC)"
+	mkdir -p checkpoints
+	$(PYTHON) scripts/download_models.py --cache-dir checkpoints --create-checkpoints
+	@echo "$(GREEN)Model checkpoints installed!$(NC)"
+
 download-models:
 	@echo "$(YELLOW)Downloading models from Huggingface...$(NC)"
-	. ./venv/bin/activate && $(PYTHON) scripts/download_models.py --create-checkpoints
+	. ./venv/bin/activate && $(PYTHON) scripts/download_models.py --cache-dir checkpoints
 	@echo "$(GREEN)Models downloaded!$(NC)"
 
 install-frontend:
@@ -59,16 +65,10 @@ build-frontend:
 create-checkpoints:
 	@echo "$(YELLOW)Creating trained model checkpoints...$(NC)"
 	mkdir -p checkpoints
-	@$(PYTHON) -c "\
-import torch; \
-import torchvision.models as models; \
-from pathlib import Path; \
-models_to_create = [('Inception_V3', models.inception_v3), ('ResNet50', models.resnet50), ('DenseNet121', models.densenet121), ('ConvNeXt_Tiny', models.convnext_tiny)]; \
-checkpoints_dir = Path('checkpoints'); \
-[torch.save({'model_state_dict': (lambda m: (setattr(m, 'fc', torch.nn.Linear(m.fc.in_features, 2)) if hasattr(m, 'fc') else setattr(m, 'classifier', torch.nn.Linear(m.classifier.in_features, 2))) or m)(model_func(weights='DEFAULT')).state_dict(), 'model_name': model_name, 'num_classes': 2, 'trained': True}, checkpoints_dir / f'default_{model_name}.pth') or print(f'✓ Created {model_name}') for model_name, model_func in models_to_create]"
+	$(PYTHON) -c "import torch; import torchvision.models as models; from pathlib import Path; models_to_create = [('Inception_V3', models.inception_v3), ('ResNet50', models.resnet50), ('DenseNet121', models.densenet121), ('ConvNeXt_Tiny', models.convnext_tiny)]; checkpoints_dir = Path('checkpoints'); [torch.save({'model_state_dict': (lambda m: (setattr(m, 'fc', torch.nn.Linear(m.fc.in_features, 2)) if hasattr(m, 'fc') else setattr(m, 'classifier', torch.nn.Linear(m.classifier.in_features, 2))) or m)(model_func(weights='DEFAULT')).state_dict(), 'model_name': model_name, 'num_classes': 2, 'trained': True}, checkpoints_dir / f'default_{model_name}.pth') or print(f'✓ Created {model_name}') for model_name, model_func in models_to_create]"
 	@echo "$(GREEN)Model checkpoints created!$(NC)"
 
-docker-build: create-checkpoints
+docker-build: install-checkpoints
 	@echo "$(YELLOW)Building Docker image...$(NC)"
 	docker build -t $(PROJECT_NAME) .
 	@echo "$(GREEN)Docker image built!$(NC)"
@@ -116,4 +116,4 @@ docker-clean:
 	docker system prune -f
 	@echo "$(GREEN)Docker cleanup complete!$(NC)"
 
-.PHONY: create-checkpoints download-models docker-up docker-up-fullstack docker-down docker-logs docker-rebuild docker-clean
+.PHONY: install-checkpoints create-checkpoints download-models docker-up docker-up-fullstack docker-down docker-logs docker-rebuild docker-clean
