@@ -5,10 +5,11 @@ FROM python:3.11-slim AS backend-builder
 
 WORKDIR /app
 
-# Install system dependencies for backend
+# Install system dependencies for backend (including git for huggingface)
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install poetry
@@ -22,6 +23,36 @@ RUN poetry config virtualenvs.create true && \
     poetry config virtualenvs.in-project true && \
     poetry lock && \
     poetry install --only main --no-root
+
+# Download models from Huggingface
+RUN mkdir -p /app/checkpoints && \
+    python -c "
+import os
+os.environ['HF_HOME'] = '/app/checkpoints'
+try:
+    from transformers import AutoModel, AutoTokenizer
+    from huggingface_hub import hf_hub_download
+
+    # Download common models (adjust model names as needed)
+    models = [
+        'microsoft/resnet-50',
+        'google/vit-base-patch16-224',
+        'facebook/convnext-base-224-22k',
+    ]
+
+    for model_name in models:
+        try:
+            print(f'Downloading {model_name}...')
+            AutoModel.from_pretrained(model_name, cache_dir='/app/checkpoints')
+            print(f'Successfully downloaded {model_name}')
+        except Exception as e:
+            print(f'Failed to download {model_name}: {e}')
+
+except ImportError:
+    print('Transformers not available, skipping model downloads')
+except Exception as e:
+    print(f'Error downloading models: {e}')
+"
 
 # Stage 2: Frontend builder
 FROM node:18-slim AS frontend-builder
@@ -48,13 +79,17 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
 
-# Install system runtime dependencies
+# Install system runtime dependencies (including git for huggingface)
 RUN apt-get update && apt-get install -y \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy backend virtual environment from builder
 COPY --from=backend-builder --chown=appuser:appuser /app/.venv /app/.venv
+
+# Copy downloaded models from builder
+COPY --from=backend-builder --chown=appuser:appuser /app/checkpoints /app/checkpoints
 
 ENV PATH="/app/.venv/bin:$PATH"
 
@@ -100,11 +135,12 @@ CMD ["nginx", "-g", "daemon off;"]
 # Stage 5: Full application (both backend and frontend)
 FROM python:3.11-slim AS fullstack
 
-# Install system dependencies
+# Install system dependencies (including git for huggingface)
 RUN apt-get update && apt-get install -y \
     curl \
     nginx \
     supervisor \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -114,6 +150,7 @@ WORKDIR /app
 
 # Copy backend from backend stage
 COPY --from=backend-builder --chown=appuser:appuser /app/.venv /app/.venv
+COPY --from=backend-builder --chown=appuser:appuser /app/checkpoints /app/checkpoints
 COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
 COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
 COPY --chown=appuser:appuser configs ./configs

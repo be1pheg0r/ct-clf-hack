@@ -8,7 +8,7 @@ YELLOW := \033[33m
 RED := \033[31m
 NC := \033[0m
 
-install: install-backend install-frontend
+install: install-backend install-frontend download-models
 	@echo "$(GREEN)Installation complete!$(NC)"
 
 install-backend:
@@ -19,6 +19,11 @@ install-backend:
 	poetry lock
 	poetry install
 	@echo "$(GREEN)Backend dependencies installed!$(NC)"
+
+download-models:
+	@echo "$(YELLOW)Downloading models from Huggingface...$(NC)"
+	. ./venv/bin/activate && $(PYTHON) scripts/download_models.py
+	@echo "$(GREEN)Models downloaded!$(NC)"
 
 install-frontend:
 	@echo "$(YELLOW)Installing frontend dependencies...$(NC)"
@@ -100,4 +105,4 @@ docker-clean:
 	docker system prune -f
 	@echo "$(GREEN)Docker cleanup complete!$(NC)"
 
-.PHONY: docker-up docker-up-fullstack docker-down docker-logs docker-rebuild docker-clean
+.PHONY: download-models docker-up docker-up-fullstack docker-down docker-logs docker-rebuild docker-clean
