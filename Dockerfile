@@ -64,7 +64,7 @@ COPY --chown=appuser:appuser configs ./configs
 COPY --chown=appuser:appuser checkpoints ./checkpoints
 
 # Create necessary directories
-RUN mkdir -p /app/data /app/logs /app/cache && \
+RUN mkdir -p /app/data /app/logs /app/cache app/checkpoints && \
     chown -R appuser:appuser /app/data /app/logs /app/cache
 
 USER appuser
