@@ -5,7 +5,7 @@ description = ""
 authors = [
     {name = "be1pheg0r",email = "147649274+be1pheg0r@users.noreply.github.com"}
 ]
-includes =[ "ct_clf_hack"]
+includes =[ "ct_clf_hack", "ct_clf_backend"]
 
 [tool.poetry.dependencies]
 python = ">=3.9, <3.13"
@@ -27,6 +27,13 @@ torch = "^2.8.0"
 torchvision = "^0.23.0"
 opencv-python = "^4.12.0.88"
 albumentations = "*"
+sqlalchemy=">=2.0.0"
+fastapi = ">=0.115.6"
+uvicorn = ">=0.34.0"
+python-multipart = "*"
+pydantic = "*"
+openpyxl= "*"
+huggingface-hub = "*"
 
 [tool.pytest.ini_options]
 markers = [
