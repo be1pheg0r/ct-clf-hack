@@ -53,6 +53,7 @@ build-frontend:
 
 docker-build:
 	@echo "$(YELLOW)Building Docker image...$(NC)"
+	mkdir -p checkpoints
 	docker build -t $(PROJECT_NAME) .
 	@echo "$(GREEN)Docker image built!$(NC)"
 
@@ -90,6 +91,7 @@ docker-logs:
 docker-rebuild:
 	@echo "$(YELLOW)Rebuilding and restarting services...$(NC)"
 	docker-compose down
+	mkdir -p checkpoints
 	docker-compose build --no-cache
 	docker-compose up -d
 	@echo "$(GREEN)Services rebuilt and restarted!$(NC)"
