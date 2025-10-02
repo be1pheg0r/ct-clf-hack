@@ -14,14 +14,13 @@ RUN apt-get update && apt-get install -y \
 # Install poetry
 RUN pip install poetry
 
-# Copy backend dependency files (handle missing poetry.lock)
+# Copy backend dependency files
 COPY pyproject.toml ./
-COPY poetry.loc[k] ./ 2>/dev/null || true
 
-# Generate poetry.lock if it doesn't exist and install dependencies
+# Generate poetry.lock and install dependencies
 RUN poetry config virtualenvs.create true && \
     poetry config virtualenvs.in-project true && \
-    (test -f poetry.lock || poetry lock) && \
+    poetry lock --no-update && \
     poetry install --no-dev --no-root
 
 # Stage 2: Frontend builder

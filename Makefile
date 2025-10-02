@@ -53,8 +53,6 @@ build-frontend:
 
 docker-build:
 	@echo "$(YELLOW)Building Docker image...$(NC)"
-	@echo "$(YELLOW)Generating poetry.lock if needed...$(NC)"
-	@if [ ! -f poetry.lock ]; then poetry lock --no-update; fi
 	docker build -t $(PROJECT_NAME) .
 	@echo "$(GREEN)Docker image built!$(NC)"
 
@@ -92,8 +90,6 @@ docker-logs:
 docker-rebuild:
 	@echo "$(YELLOW)Rebuilding and restarting services...$(NC)"
 	docker-compose down
-	@echo "$(YELLOW)Generating poetry.lock if needed...$(NC)"
-	@if [ ! -f poetry.lock ]; then poetry lock --no-update; fi
 	docker-compose build --no-cache
 	docker-compose up -d
 	@echo "$(GREEN)Services rebuilt and restarted!$(NC)"
