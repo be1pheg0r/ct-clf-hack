@@ -97,6 +97,10 @@ COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
 COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
 COPY --chown=appuser:appuser configs ./configs
 
+# Create project marker files for path detection
+RUN touch /app/pyproject.toml /app/.project_root && \
+    chown appuser:appuser /app/pyproject.toml /app/.project_root
+
 # Create checkpoints directory
 RUN mkdir -p /app/checkpoints && \
     chown -R appuser:appuser /app/checkpoints
@@ -112,7 +116,8 @@ ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     OPENCV_IO_ENABLE_OPENEXR=1 \
     QT_QPA_PLATFORM=offscreen \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    PROJECT_ROOT=/app
 
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
@@ -167,6 +172,10 @@ COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
 COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
 COPY --chown=appuser:appuser configs ./configs
 
+# Create project marker files for path detection
+RUN touch /app/pyproject.toml /app/.project_root && \
+    chown appuser:appuser /app/pyproject.toml /app/.project_root
+
 # Create checkpoints directory
 RUN mkdir -p /app/checkpoints && \
     chown -R appuser:appuser /app/checkpoints
@@ -188,7 +197,8 @@ ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     OPENCV_IO_ENABLE_OPENEXR=1 \
     QT_QPA_PLATFORM=offscreen \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    PROJECT_ROOT=/app
 
 EXPOSE 80 8000
 
