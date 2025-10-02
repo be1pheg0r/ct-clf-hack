@@ -14,6 +14,26 @@ def download_models(cache_dir: str = "./checkpoints") -> None:
     Args:
         cache_dir: Директория для кэша моделей
     """
+    # Устанавливаем переменные окружения для headless режима
+    os.environ['OPENCV_IO_ENABLE_OPENEXR'] = '1'
+    os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+
+    # Проверяем OpenCV headless
+    try:
+        import cv2
+        print(f"OpenCV version: {cv2.__version__}")
+        print("OpenCV успешно импортирован в headless режиме")
+    except ImportError as e:
+        print(f"WARNING: OpenCV import failed: {e}")
+        print("Попытка установки opencv-python-headless...")
+        try:
+            import subprocess
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "opencv-python-headless"])
+            import cv2
+            print(f"OpenCV headless version: {cv2.__version__}")
+        except Exception as install_error:
+            print(f"Не удалось установить opencv-python-headless: {install_error}")
+
     try:
         from transformers import AutoModel, AutoTokenizer
         from huggingface_hub import hf_hub_download

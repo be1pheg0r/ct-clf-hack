@@ -5,18 +5,21 @@ FROM python:3.11-slim AS backend-builder
 
 WORKDIR /app
 
-# Install system dependencies for backend (including OpenGL and X11 for OpenCV)
+# Install system dependencies for backend (OpenCV headless compatible)
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     git \
-    libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
     libgthread-2.0-0 \
+    libfontconfig1 \
+    ffmpeg \
+    libavcodec-dev \
+    libavformat-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install poetry
@@ -65,17 +68,20 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
 
-# Install system runtime dependencies (including OpenGL and X11 for OpenCV)
+# Install system runtime dependencies (OpenCV headless compatible)
 RUN apt-get update && apt-get install -y \
     curl \
     git \
-    libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
     libgthread-2.0-0 \
+    libfontconfig1 \
+    ffmpeg \
+    libavcodec-dev \
+    libavformat-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy backend virtual environment from builder
@@ -105,7 +111,8 @@ ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     OPENCV_IO_ENABLE_OPENEXR=1 \
-    QT_QPA_PLATFORM=offscreen
+    QT_QPA_PLATFORM=offscreen \
+    DEBIAN_FRONTEND=noninteractive
 
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
@@ -130,19 +137,22 @@ CMD ["nginx", "-g", "daemon off;"]
 # Stage 5: Full application (both backend and frontend)
 FROM python:3.11-slim AS fullstack
 
-# Install system dependencies (including OpenGL and X11 for OpenCV)
+# Install system dependencies (OpenCV headless compatible)
 RUN apt-get update && apt-get install -y \
     curl \
     nginx \
     supervisor \
     git \
-    libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
     libgthread-2.0-0 \
+    libfontconfig1 \
+    ffmpeg \
+    libavcodec-dev \
+    libavformat-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -177,7 +187,8 @@ ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     OPENCV_IO_ENABLE_OPENEXR=1 \
-    QT_QPA_PLATFORM=offscreen
+    QT_QPA_PLATFORM=offscreen \
+    DEBIAN_FRONTEND=noninteractive
 
 EXPOSE 80 8000
 
