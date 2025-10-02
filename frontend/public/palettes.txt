@@ -1,0 +1,46 @@
+Цветовая палитра №4447 https://color.romanuke.com/czvetovaya-palitra-4447/
+#22222E 3
+#393A5A 5
+#706F8E 4
+#ADA9BA 1
+#E9E9E9 2
+
+
+Цветовая палитра №4444 https://color.romanuke.com/czvetovaya-palitra-4444/
+#A2B6B5 3
+#E7E8E3 1
+#DFE27C 5
+#6F7239 4
+#2E3034 2
+
+
+Цветовая палитра №3852 https://color.romanuke.com/tsvetovaya-palitra-3852/
+#000010 1
+#cacac8 3
+#ffffff 2
+#b6846b 4
+#f73149 5
+
+
+Цветовая палитра №1993 https://color.romanuke.com/tsvetovaya-palitra-1993/
+#413a31 5
+#8f8272 4
+#aea293 3
+#cdc2ae 2
+#f3f0eb 1
+
+
+Цветовая палитра №207 https://color.romanuke.com/tsvetovaya-palitra-207/
+#417487 5
+#9b8675 3
+#ffffff 1
+#414046 2
+#080808 4
+
+
+Clockwork https://www.figma.com/color-palettes/clockwork/
+#919599 3
+#CDCDCB 1
+#F8F8F8 2
+#FBA45C 4
+#E56515 5

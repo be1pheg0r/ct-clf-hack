@@ -1,0 +1,1117 @@
+:root{
+  --bg:#f7f8fa;
+  --card:#ffffff;
+  --muted:#6b7280;
+  --accent:#10a37f; /* зеленый акцент */
+  --primary:#0b74ff; /* синий для пользователя */
+  --bubble-user: linear-gradient(90deg,#0b74ff,#0066d6);
+  --bubble-system:#f3f4f6;
+  --shadow: 0 6px 18px rgba(18,22,26,0.08);
+  --radius:14px;
+  --glass: rgba(255,255,255,0.6);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+* { box-sizing: border-box; }
+html,body,#root { height: 100%; margin: 0; background: var(--bg); }
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+}
+
+/* Header */
+.app-header {
+  width: 100%;
+  max-width: 900px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 12px 18px;
+}
+.brand {
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.brand-logo {
+  width:48px;
+  height:48px;
+  border-radius:12px;
+  background: linear-gradient(135deg,#0b74ff,#00bfa5);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  font-weight:700;
+  box-shadow: var(--shadow);
+}
+.brand-text h1 {
+  margin:0;
+  font-size:18px;
+  letter-spacing:0.4px;
+}
+.brand-sub {
+  display:block;
+  font-size:12px;
+  color:var(--muted);
+}
+
+/* Main card */
+.main {
+  width:100%;
+  max-width:900px;
+  flex:1;
+  display:flex;
+  align-items:stretch;
+  justify-content:center;
+}
+
+.chat-window {
+  width:100%;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+  overflow-y: auto;
+  max-height: calc(100vh - 240px);
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+}
+
+/* Message rows and bubbles */
+.message-row {
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  width:100%;
+}
+
+/* avatar */
+.avatar {
+  min-width:36px;
+  min-height:36px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:600;
+  font-size:13px;
+  color: white;
+  flex-shrink:0;
+}
+.avatar-system {
+  background: linear-gradient(180deg,#e5e7eb,#d1d5db);
+  color:#111827;
+  box-shadow: 0 2px 6px rgba(2,6,23,0.06);
+}
+.avatar-user {
+  background: linear-gradient(180deg,var(--primary),#0056b3);
+}
+
+/* alignment helpers */
+.user-row { justify-content:flex-end; }
+.system-row { justify-content:flex-start; }
+
+/* bubble */
+.bubble {
+  max-width: 78%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  line-height: 1.45;
+  white-space: pre-line;
+  word-wrap: break-word;
+  box-shadow: 0 3px 10px rgba(2,6,23,0.04);
+}
+
+.bubble-system {
+  background: var(--bubble-system);
+  color: #111827;
+  border: 1px solid rgba(15,23,42,0.03);
+  border-top-left-radius: 6px;
+}
+
+.bubble-user {
+  color: white;
+  background: var(--bubble-user);
+  background-image: linear-gradient(90deg,#0b74ff,#0066d6);
+  border-radius: 18px;
+}
+
+/* content inside bubble - allow small code style */
+.bubble-content code {
+  background:#0b1220;
+  color:#e6f6ed;
+  padding:2px 6px;
+  border-radius:6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+  font-size: 13px;
+}
+
+/* Footer / upload area */
+.app-footer {
+  width:100%;
+  max-width:900px;
+  padding: 12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  align-items:center;
+}
+
+.upload-area {
+  width:100%;
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:center;
+  padding:10px;
+  border-radius:12px;
+  background: linear-gradient(180deg, rgba(11,11,13,0.02), rgba(11,11,13,0.01));
+  border: 1px solid rgba(15,23,42,0.04);
+  transition: box-shadow .18s ease, transform .08s ease;
+}
+.upload-area--active {
+  box-shadow: 0 8px 30px rgba(11,74,255,0.06);
+  transform: translateY(-2px);
+  border-color: rgba(11,74,255,0.12);
+}
+
+.upload-btn {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 14px;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+  background: linear-gradient(90deg,#0b74ff,#0066d6);
+  color:white;
+  font-weight:600;
+  box-shadow: 0 6px 20px rgba(11,74,255,0.12);
+}
+.upload-btn svg { opacity:0.95; }
+
+.upload-hint {
+  font-size:13px;
+  color:var(--muted);
+}
+
+/* small note */
+.small-note {
+  font-size:12px;
+  color:var(--muted);
+  text-align:center;
+}
+
+/* Responsive tweaks */
+@media (max-width:640px){
+  .chat-window { padding:14px; max-height: calc(100vh - 220px); }
+  .bubble { max-width: 84%; }
+  .brand-text h1 { font-size:16px; }
+}
+
+
+
+
+
+
+
+
+
+/* --- result card styles --- */
+.result-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px;
+  width: 560px;
+  max-width: 100%;
+  box-shadow: 0 6px 20px rgba(7,11,24,0.06);
+  border: 1px solid rgba(12,17,28,0.04);
+}
+.result-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:10px;
+}
+.result-title {
+  display:flex;
+  gap:12px;
+  align-items:center;
+}
+.result-logo {
+  width:44px;
+  height:44px;
+  border-radius:10px;
+  background: linear-gradient(135deg,#e6f7ff,#dff6f2);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+}
+.result-main {
+  font-weight:600;
+  font-size:15px;
+}
+.result-sub {
+  font-size:12px;
+  color: #6b7280;
+}
+.result-badge {
+  padding:6px 10px;
+  border-radius:999px;
+  font-weight:700;
+  font-size:13px;
+}
+.result-badge.normal { background:#ecfdf5; color:#047857; border: 1px solid rgba(4,120,87,0.08); }
+.result-badge.abnormal { background:#fff1f2; color:#b91c1c; border: 1px solid rgba(185,28,28,0.06); }
+
+.result-body { display:flex; flex-direction:column; gap:8px; margin-top:6px; }
+.row { display:flex; gap:12px; align-items:center; }
+.row-label { width:160px; color:#4b5563; font-size:13px; }
+.row-value { flex:1; color:#0f172a; font-size:14px; word-break:break-all; }
+
+.progress-col { display:flex; align-items:center; gap:10px; }
+.progress-bar { height:10px; flex:1; background:#f3f4f6; border-radius:999px; overflow:hidden; }
+.fill { height:100%; transition: width .35s ease; }
+.fill.low { background: linear-gradient(90deg,#34d399,#10b981); }
+.fill.mid { background: linear-gradient(90deg,#fbbf24,#f97316); }
+.fill.high { background: linear-gradient(90deg,#fb7185,#ef4444); }
+.percent-text { min-width:44px; text-align:right; font-weight:600; }
+
+/* small utility buttons */
+.ghost-btn {
+  padding:8px 12px;
+  border-radius:10px;
+  border:1px solid rgba(2,6,23,0.06);
+  background:transparent;
+  cursor:pointer;
+  font-weight:600;
+}
+
+
+
+
+
+
+
+
+/* styles.css - добавить в конец */
+
+/* Dicom Viewer Styles
+.dicom-viewer {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px;
+  width: 560px;
+  max-width: 100%;
+  box-shadow: 0 6px 20px rgba(7,11,24,0.06);
+  border: 1px solid rgba(12,17,28,0.04);
+  margin-top: 12px;
+} */
+
+.viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.viewer-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.slice-info {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.viewer-image-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f3f4f6;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.viewer-image {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+}
+
+.viewer-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.control-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(2,6,23,0.06);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.slice-slider {
+  flex: 1;
+}
+
+
+
+.dicom-viewer { font-family: Inter, system-ui, Arial; }
+.dicom-viewer button {
+  padding:6px 8px;
+  border-radius:8px;
+  border:1px solid rgba(2,6,23,0.06);
+  background:transparent;
+  cursor:pointer;
+}
+.dicom-viewer input[type=range] {
+  appearance: none;
+  height: 6px;
+  border-radius: 6px;
+  background: #e6e9ef;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---------- SkeletonViewer — more vivid colors ---------- */
+/* Палитра: яркий бирюзово-зелёный + холодный акцент, лёгкое свечение */
+
+.skeleton-image {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f4fdfb 0%, #e9fbf4 40%, #eaf9f7 100%);
+  box-shadow: inset 0 -20px 50px rgba(4,20,30,0.04);
+}
+
+/* фон текстуры чуть холоднее — чтобы зелёные акценты выделялись */
+.scan-bg {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 25% 30%, rgba(255,255,255,0.65) 0%, transparent 14%),
+    radial-gradient(circle at 78% 72%, rgba(255,255,255,0.28) 0%, transparent 14%),
+    linear-gradient(180deg, rgba(6,18,30,0.01), rgba(6,18,30,0.00));
+  z-index: 0;
+}
+
+/* лёгкие — усиливаем основной оттенок и добавляем внутреннее свечение */
+.lung {
+  width: 46%;
+  height: 80%;
+  border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255,255,255,0.28), rgba(255,255,255,0.06) 12%),
+    linear-gradient(180deg, rgba(6,200,150,0.14), rgba(6,170,135,0.06));
+  box-shadow: 0 18px 36px rgba(3,28,40,0.06), 0 0 30px rgba(6,200,150,0.06);
+  position: relative;
+  overflow: hidden;
+  transform-origin: center;
+}
+
+/* усиление декоративной 'венки' */
+.lung::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 18%;
+  bottom: 18%;
+  border-radius: 40% / 60%;
+  background-image: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.0));
+  box-shadow: inset 0 6px 26px rgba(2,30,20,0.03);
+  transform: skewY(-6deg);
+  opacity: 0.98;
+}
+
+/* цвет линии сканера — ярче и с небольшим свечением */
+.scan-line {
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(90deg,
+    rgba(3,190,150,0.00) 0%,
+    rgba(3,190,150,0.85) 35%,
+    rgba(3,170,130,0.65) 60%,
+    rgba(3,190,150,0.00) 100%);
+  filter: blur(0.8px);
+  z-index: 3;
+  animation: scanMove 1.6s linear infinite;
+  box-shadow: 0 8px 30px rgba(3,190,150,0.10);
+}
+
+/* точка — насыщенный центр + мягкое свечение */
+.scan-dot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #b9ffee, #06d6a0 40%, #05b383 100%);
+  box-shadow: 0 10px 34px rgba(6,214,160,0.20), 0 2px 8px rgba(6,214,160,0.12);
+  z-index: 4;
+  animation: dotMove 1.6s linear infinite;
+}
+
+/* миниатюры — более заметный градиент и glow */
+.thumb-glow {
+  width: 64px;
+  height: 48px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(6,214,160,0.14), rgba(3,150,110,0.06));
+  box-shadow: 0 10px 30px rgba(6,214,160,0.08);
+  position: relative;
+  overflow: hidden;
+}
+.thumb-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  mix-blend-mode: overlay;
+  animation: thumbShimmer 1.4s linear infinite;
+}
+
+/* small-glow — делаем чуть ярче */
+.small-glow {
+  width: 48px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(6,214,160,0.10), rgba(3,150,110,0.04));
+  box-shadow: 0 8px 22px rgba(6,214,160,0.07);
+}
+
+/* бары — усиливаем с легким внутренним градиентом */
+.bar-glow {
+  height: 10px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(6,214,160,0.10), rgba(3,150,110,0.05));
+  box-shadow: 0 10px 24px rgba(3,150,110,0.05);
+  position: relative;
+  overflow: hidden;
+}
+.bar-glow.short { width: 120px; }
+
+/* подсветка внутри шкалы */
+.skeleton-progress-bar .skeleton-fill {
+  background: linear-gradient(90deg, rgba(6,214,160,0.28), rgba(6,200,150,0.18));
+  box-shadow: 0 6px 18px rgba(6,214,160,0.12);
+}
+
+/* увеличим контраст shimmer'а для миниатюр */
+@keyframes thumbShimmer {
+  0% { transform: translateX(-100%); opacity: 0.06; }
+  50% { transform: translateX(0%); opacity: 0.16; }
+  100% { transform: translateX(100%); opacity: 0.06; }
+}
+
+/* синхронизированные анимации (линия + точка) */
+@keyframes scanMove {
+  0%   { top: -8%; opacity: 0; }
+  8%   { opacity: 1; }
+  50%  { top: 50%; opacity: 0.98; }
+  92%  { opacity: 1; }
+  100% { top: 108%; opacity: 0; }
+}
+@keyframes dotMove {
+  0%   { top: -6%; transform: translateX(-50%) scale(0.92); opacity: 0.85; left: 50%; }
+  8%   { opacity: 1; }
+  50%  { top: 50%; transform: translateX(-50%) scale(1.28); opacity: 1; left: 50%; }
+  92%  { opacity: 1; }
+  100% { top: 106%; transform: translateX(-50%) scale(0.92); opacity: 0.85; left: 50%; }
+}
+
+/* немного усилим видимость скелета ResultCard (если используешь тот же акцент) */
+.skeleton-result-card .skeleton-fill {
+  background: linear-gradient(90deg, rgba(6,214,160,0.30), rgba(6,200,150,0.14));
+  box-shadow: 0 6px 16px rgba(6,214,160,0.08);
+}
+
+/* тонкие финальные правки для читаемости */
+.skeleton-line, .skeleton-percent, .skeleton-value {
+  background-size: 300% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+
+
+/* небольшая декоративная 'венка' внутри лёгкого */
+.lung::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 18%;
+  bottom: 18%;
+  border-radius: 40% / 60%;
+  background-image: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.0));
+  box-shadow: inset 0 6px 18px rgba(4,30,60,0.02);
+  transform: skewY(-6deg);
+  opacity: 0.9;
+}
+
+
+/* контур \"лёгких\" — две половинки */
+.lung-shape {
+  position: absolute;
+  inset: 28px 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1;
+  color: red;
+}
+
+.lung {
+  width: 46%;
+  height: 80%;
+  border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.22), rgba(25, 105, 255, 0.06) 15%),
+              linear-gradient(180deg, rgba(16,163,127,0.3), rgba(11,119,96,0.1));
+  box-shadow: 0 14px 30px rgba(3,16,30,0.04);
+  position: relative;
+  overflow: hidden;
+  transform-origin: center;
+}
+
+
+
+
+
+
+
+
+
+
+/* SkeletonResultCard styles */
+.skeleton-result-card {
+  width: 560px;
+  max-width: 100%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(248,250,252,0.95));
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 6px 20px rgba(7,11,24,0.04);
+  border: 1px solid rgba(12,17,28,0.04);
+  font-family: Inter, system-ui, Arial;
+}
+
+.skeleton-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.skeleton-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #eef6f3 0%, #f9fbfd 50%, #eef6f3 100%);
+  box-shadow: inset 0 -6px 12px rgba(11,119,96,0.02);
+  position: relative;
+  overflow: hidden;
+}
+.skeleton-badge {
+  width: 76px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(16,163,127,0.06));
+  margin-left: 12px;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e9eef3 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+.skeleton-line.short { width: 160px; }
+.skeleton-line.tiny { width: 90px; }
+.skeleton-line.small { height: 10px; width: 80px; }
+
+.skeleton-body { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.skeleton-row { display:flex; align-items:center; gap:12px; }
+.skeleton-row.small { align-items:flex-start; }
+
+.skeleton-label { width: 140px; height: 12px; border-radius: 6px; background: linear-gradient(90deg, #eef2f6, #f7fafc); }
+.skeleton-value { flex:1; height: 14px; border-radius: 6px; background: linear-gradient(90deg, #f3f6f9, #eef4f8); }
+.skeleton-value.long { height: 12px; }
+
+.skeleton-progress { display:flex; align-items:center; gap:10px; }
+.skeleton-progress-bar { flex:1; height:10px; background:#e9eef6; border-radius:999px; overflow:hidden; position:relative; }
+.skeleton-fill { position:absolute; left: -40%; top:0; bottom:0; width:40%; background: linear-gradient(90deg, rgba(16,163,127,0.24), rgba(16,163,127,0.08)); animation: slideFill 1.4s linear infinite; }
+.skeleton-percent { width:44px; height:14px; border-radius:6px; background: linear-gradient(90deg, #f3f4f6, #eef4f9); }
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes slideFill {
+  0% { left: -40%; width: 40%; opacity: 0.6; }
+  50% { left: 30%; width: 24%; opacity: 1; }
+  100% { left: 110%; width: 40%; opacity: 0.6; }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/* Download XLSX button styles */
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  transition: transform .08s ease, box-shadow .12s ease, opacity .12s ease;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+  background: linear-gradient(180deg, #f6fdf8, #eefaf3);
+  color: #063829;
+}
+
+/* XLSX variant (green) */
+.download-btn.xlsx {
+  background: linear-gradient(90deg, #08b786 0%, #05a06b 100%);
+  color: white;
+  box-shadow: 0 8px 26px rgba(6,167,120,0.18), inset 0 -6px 18px rgba(0,0,0,0.04);
+}
+
+/* disabled look */
+.download-btn[disabled], .download-btn[aria-disabled="true"] {
+  opacity: 0.56;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* icon */
+.download-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+/* label */
+.download-label {
+  white-space: nowrap;
+}
+
+/* small file extension badge */
+.file-ext-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.98);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+}
+
+/* hover/focus states */
+.download-btn.xlsx:hover:not([disabled]) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 36px rgba(6,167,120,0.20);
+}
+.download-btn.xlsx:active:not([disabled]) {
+  transform: translateY(0);
+}
+.download-btn.xlsx:focus {
+  outline: 3px solid rgba(5,160,110,0.18);
+  outline-offset: 2px;
+}
+
+
+
+
+/* ResultCard footer & download button placement */
+.result-card-footer {
+  width: 100%;
+  display: block;
+}
+
+/* On small screens center the button and allow it to be full-width */
+@media (max-width: 640px) {
+  .result-card-footer {
+    justify-content: center;
+  }
+  .download-btn.xlsx {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 12px;
+  }
+  .file-ext-badge {
+    display: none; /* small screens: hide compact badge to save space */
+  }
+}
+
+.download-btn.download-full {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-around; /* icon left, badge right */
+  gap: 6px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
+
+.download-btn.download-full .download-label {
+  flex: 1;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.download-btn.download-full .download-icon {
+  width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.download-btn.download-full .file-ext-badge {
+  min-width: 52px;
+  text-align: center;
+}
+
+/* XLSX variant (green) */
+.download-btn.xlsx {
+  background: linear-gradient(90deg, #08b786 0%, #05a06b 100%);
+  color: white;
+  box-shadow: 0 8px 26px rgba(6,167,120,0.18), inset 0 -6px 18px rgba(0,0,0,0.04);
+  border: none;
+  border-radius: 10px;
+}
+
+/* disabled look */
+.download-btn[disabled], .download-btn[aria-disabled="true"] {
+  opacity: 0.56;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Responsive tweaks: keep full-width on small screens, hide badge if needed */
+@media (max-width: 640px) {
+  .download-btn.download-full {
+    padding: 12px;
+  }
+  .file-ext-badge {
+    display: none;
+  }
+}
+
+
+
+
+
+
+/* --- SkeletonResultCard adjustments & download-button skeleton --- */
+
+/* чуть уменьшить высоту аватара чтобы соответствовало header */
+.skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef6f3 0%, #f9fbfd 50%, #eef6f3 100%);
+  box-shadow: inset 0 -6px 12px rgba(11,119,96,0.02);
+}
+
+/* badge */
+.skeleton-badge {
+  width: 72px;
+  height: 26px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(16,163,127,0.06));
+}
+
+/* корректируем размеры линий/меток */
+.skeleton-line.short { width: 150px; height: 12px; border-radius: 8px; }
+.skeleton-line.tiny { width: 100px; height: 10px; border-radius: 8px; }
+
+.skeleton-label { width: 140px; height: 12px; border-radius: 6px; }
+.skeleton-value { height: 14px; border-radius: 6px; background: linear-gradient(90deg, #f3f6f9, #eef4f8); }
+.skeleton-value.long { height: 14px; }
+
+/* small variants */
+.skeleton-label.small { width: 120px; height: 12px; }
+.skeleton-value.small { height: 12px; }
+
+/* ensure progress bar sizes */
+.skeleton-progress { display:flex; align-items:center; gap:10px; }
+.skeleton-progress-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: #e9eef6;
+  position: relative;
+  overflow: hidden;
+}
+/* skeleton fill uses existing animation slideFill */
+.skeleton-fill { position:absolute; left: -40%; top:0; bottom:0; width:40%; background: linear-gradient(90deg, rgba(16,163,127,0.24), rgba(16,163,127,0.08)); animation: slideFill 1.4s linear infinite; }
+
+/* download button skeleton wrapper */
+.skeleton-download-wrapper {
+  padding-top: 8px;
+}
+
+/* full-width download skeleton that mimics real button layout */
+.skeleton-download {
+  width: 100%;
+  height: 46px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  background: linear-gradient(90deg, rgba(6,214,160,0.08), rgba(3,150,110,0.03));
+  box-shadow: 0 6px 18px rgba(6,214,160,0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+/* icon placeholder */
+.skeleton-download-icon {
+  width: 36px;
+  height: 28px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  flex: 0 0 auto;
+}
+
+/* text placeholder centered */
+.skeleton-download-text {
+  flex: 1;
+  height: 16px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e9eef3 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+
+/* small badge on the right */
+.skeleton-download-badge {
+  width: 52px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(16,163,127,0.06));
+  flex: 0 0 auto;
+}
+
+/* fallback shimmer/slideFill if not present (re-declare safely) */
+@keyframes slideFill {
+  0% { left: -40%; width: 40%; opacity: 0.6; }
+  50% { left: 30%; width: 24%; opacity: 1; }
+  100% { left: 110%; width: 40%; opacity: 0.6; }
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* a little responsive polish */
+@media (max-width: 640px) {
+  .skeleton-line.short { width: 120px; }
+  .skeleton-badge { width: 64px; height: 24px; }
+  .skeleton-download { height: 44px; }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* UIDField styles */
+.uid-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0; /* важно для корректного flex truncation inside .row-value */
+}
+
+.uid-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+  font-size: 13px;
+  color: #0f172a;
+  /* allow wrapping at inserted zero-width spaces (and generally anywhere if needed) */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  flex: 1 1 auto;
+  line-height: 1.25;
+  word-spacing: normal;
+  hyphens: none;
+  /* ensure it doesn't force parent to grow */
+  min-width: 0;
+}
+
+/* copy button */
+.uid-copy-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(2,6,23,0.05);
+  background: transparent;
+  color: #0f172a;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  width: 36px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .12s ease, transform .06s ease;
+}
+.uid-copy-btn:hover:not(:disabled) {
+  background: rgba(2,6,23,0.04);
+  transform: translateY(-1px);
+}
+.uid-copy-btn:active {
+  transform: translateY(0);
+}
+.uid-copy-btn[aria-label="Скопировано"] {
+  background: rgba(6,214,160,0.08);
+  color: #047857;
+}
+
+/* ensure row-value won't overflow layout */
+.row-value {
+  flex: 1;
+  color: #0f172a;
+  font-size: 14px;
+  word-break: break-word;
+  min-width: 0; /* VERY IMPORTANT: allow flex children to shrink */
+}
+
+/* PathField (wrap & copy) */
+.path-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0; /* позволяет корректно сжиматься внутри flex-контейнера */
+}
+
+.path-text {
+  font-size: 14px;
+  color: #0f172a;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+/* copy button styling similar to uid-copy-btn */
+.path-copy-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(2,6,23,0.05);
+  background: transparent;
+  color: #0f172a;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  width: 36px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .12s ease, transform .06s ease;
+}
+.path-copy-btn:hover:not(:disabled) {
+  background: rgba(2,6,23,0.04);
+  transform: translateY(-1px);
+}
+.path-copy-btn:active {
+  transform: translateY(0);
+}
+.path-copy-btn[aria-label="Скопировано"] {
+  background: rgba(6,214,160,0.08);
+  color: #047857;
+}
+
+/* ensure row-value remains responsive */
+.row-value { min-width: 0; }

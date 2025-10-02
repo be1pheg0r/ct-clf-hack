@@ -1,7 +1,2 @@
-norma_anon: 0
-pneumonia_anon: 1
-pneumotorax_anon: 1
-CT-0: 0
-CT-1: 1
-CT-2: 1
-CT-3: 1
+test_data/norma_anon: 0
+test_data/pneumonia_anon: 1
