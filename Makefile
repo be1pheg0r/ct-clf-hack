@@ -53,8 +53,6 @@ build-frontend:
 
 docker-build:
 	@echo "$(YELLOW)Building Docker image...$(NC)"
-	@mkdir -p checkpoints
-	@touch checkpoints/.gitkeep
 	docker build -t $(PROJECT_NAME) .
 	@echo "$(GREEN)Docker image built!$(NC)"
 
@@ -77,8 +75,6 @@ docker-up:
 
 docker-up-fullstack:
 	@echo "$(YELLOW)Starting fullstack service...$(NC)"
-	@mkdir -p checkpoints
-	@touch checkpoints/.gitkeep
 	docker-compose --profile fullstack up -d fullstack
 	@echo "$(GREEN)Fullstack service started! Access at http://localhost$(NC)"
 
@@ -94,8 +90,6 @@ docker-logs:
 docker-rebuild:
 	@echo "$(YELLOW)Rebuilding and restarting services...$(NC)"
 	docker-compose down
-	@mkdir -p checkpoints
-	@touch checkpoints/.gitkeep
 	docker-compose build --no-cache
 	docker-compose up -d
 	@echo "$(GREEN)Services rebuilt and restarted!$(NC)"

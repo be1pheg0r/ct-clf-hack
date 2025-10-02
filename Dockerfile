@@ -14,14 +14,13 @@ RUN apt-get update && apt-get install -y \
 # Install poetry
 RUN pip install poetry
 
-# Copy backend dependency files (create empty files if they don't exist)
-COPY pyproject.toml* poetry.lock* ./
-RUN test -f pyproject.toml || echo '[tool.poetry]\nname = "ct-clf-hack"\nversion = "0.1.0"\ndescription = ""\nauthors = []\n\n[tool.poetry.dependencies]\npython = "^3.11"\n\n[build-system]\nrequires = ["poetry-core"]\nbuild-backend = "poetry.core.masonry.api"' > pyproject.toml
+# Copy backend dependency files
+COPY pyproject.toml poetry.lock ./
 
 # Configure poetry and install dependencies
 RUN poetry config virtualenvs.create true && \
     poetry config virtualenvs.in-project true && \
-    poetry install --no-dev --no-root || echo "No dependencies to install"
+    poetry install --no-dev --no-root
 
 # Stage 2: Frontend builder
 FROM node:18-slim AS frontend-builder
@@ -63,10 +62,9 @@ COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
 COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
 COPY --chown=appuser:appuser configs ./configs
 
-# Create checkpoints directory and copy if exists
-RUN mkdir -p /app/checkpoints
-COPY checkpoints/ ./checkpoints/ 2>/dev/null || true
-RUN chown -R appuser:appuser /app/checkpoints
+# Create checkpoints directory
+RUN mkdir -p /app/checkpoints && \
+    chown -R appuser:appuser /app/checkpoints
 
 # Create necessary directories
 RUN mkdir -p /app/data /app/logs /app/cache && \
@@ -119,10 +117,9 @@ COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
 COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
 COPY --chown=appuser:appuser configs ./configs
 
-# Create and copy checkpoints directory
-RUN mkdir -p /app/checkpoints
-COPY checkpoints/ ./checkpoints/ 2>/dev/null || true
-RUN chown -R appuser:appuser /app/checkpoints
+# Create checkpoints directory
+RUN mkdir -p /app/checkpoints && \
+    chown -R appuser:appuser /app/checkpoints
 
 # Copy built frontend from frontend builder
 COPY --from=frontend-builder /app/frontend/build /usr/share/nginx/html
