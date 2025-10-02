@@ -1,155 +1,223 @@
-"""
-Скрипт для установки обученных чекпойнтов моделей.
-"""
-
+import argparse
+import logging
+import os
+import shutil
 import sys
-import torch
-import torchvision.models as models
 from pathlib import Path
-from typing import Tuple, List, Any, Callable
+from typing import Dict, Any, Optional
+
+# Настройки по умолчанию
+MIN_REASONABLE_SIZE = 1024  # bytes - минимальный размер файла, считаем валидным
 
 
-def install_model_checkpoints(checkpoints_dir: str = "./checkpoints") -> None:
+def setup_logging(verbose: bool = False) -> None:
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)-7s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+
+def download_file_with_hf(
+    repo_id: str,
+    filename: str,
+    target_path: Path,
+    token: Optional[str] = None,
+    use_snapshot: bool = False,
+    force_download: bool = False,
+) -> bool:
+    """Скачивает один файл из репозитория Hugging Face.
+
+    Возвращает True если файл успешно доставлен в target_path и имеет адекватный размер.
     """
-    Устанавливает обученные чекпойнты моделей для классификации.
+    try:
+        from huggingface_hub import hf_hub_download, snapshot_download, login
+    except Exception as e:  # ImportError и т.п.
+        logging.error("huggingface_hub не установлен: %s", e)
+        raise
 
-    Args:
-        checkpoints_dir: Директория для сохранения чекпойнтов
-    """
-    cache_path = Path(checkpoints_dir)
-    cache_path.mkdir(exist_ok=True)
-
-    print(f"Установка обученных моделей в: {cache_path}")
-
-    models_to_create: List[Tuple[str, Callable]] = [
-        ('Inception_V3', models.inception_v3),
-        ('ResNet50', models.resnet50),
-        ('DenseNet121', models.densenet121),
-        ('ConvNeXt_Tiny', models.convnext_tiny)
-    ]
-
-    successful_creates = 0
-    failed_creates = 0
-    skipped = 0
-
-    for model_name, model_func in models_to_create:
-        checkpoint_path = cache_path / f'default_{model_name}.pth'
-
-        # Проверяем, существует ли уже валидный чекпойнт
-        if checkpoint_path.exists() and checkpoint_path.stat().st_size > 100:
-            print(f"⚠ Пропускаем {model_name} - чекпойнт уже существует ({checkpoint_path.stat().st_size} bytes)")
-            skipped += 1
-            continue
-
+    # Авторизация (безопасно — login хранит токен в окружении)
+    if token:
         try:
-            print(f"Создание модели {model_name}...")
+            # login просто установит токен локально для клиента
+            login(token)
+            logging.debug("Аутентификация через переданный токен выполнена")
+        except Exception:
+            # не критично падать на login; hf_hub_download примет token=token
+            logging.debug("Не удалось выполнить login(token) — продолжим, передав token в вызовы")
 
-            # Загружаем предобученную модель
-            model = model_func(weights='DEFAULT')
+    # Попробуем snapshot_download (скачивает/копирует папку репо локально)
+    if use_snapshot:
+        try:
+            logging.info("Используем snapshot_download для %s (фильтр: %s)", repo_id, filename)
+            local_repo_dir = snapshot_download(
+                repo_id=repo_id,
+                allow_patterns=[filename],
+                token=token,
+                local_dir=None,
+                ignore_patterns=None,
+            )
+            candidate = Path(local_repo_dir) / filename
+            if candidate.exists():
+                # Копируем файл в целевую папку
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(candidate, target_path)
+                logging.debug("Скопирован %s -> %s", candidate, target_path)
+            else:
+                raise FileNotFoundError(f"Файл {filename} не найден в snapshot {local_repo_dir}")
+        except Exception as e:
+            logging.exception("snapshot_download не удался: %s", e)
+            return False
 
-            # Модифицируем последний слой для бинарной классификации
-            if 'ResNet' in model_name or 'DenseNet' in model_name:
-                if hasattr(model, 'classifier'):
-                    in_features = model.classifier.in_features
-                    model.classifier = torch.nn.Linear(in_features, 2)
-                elif hasattr(model, 'fc'):
-                    in_features = model.fc.in_features
-                    model.fc = torch.nn.Linear(in_features, 2)
-            elif 'Inception' in model_name:
-                if hasattr(model, 'fc'):
-                    in_features = model.fc.in_features
-                    model.fc = torch.nn.Linear(in_features, 2)
-                # Inception также имеет auxiliary classifier
-                if hasattr(model, 'AuxLogits') and hasattr(model.AuxLogits, 'fc'):
-                    in_features = model.AuxLogits.fc.in_features
-                    model.AuxLogits.fc = torch.nn.Linear(in_features, 2)
-            elif 'ConvNeXt' in model_name:
-                if hasattr(model, 'classifier'):
-                    # ConvNeXt имеет более сложную структуру classifier
-                    if len(model.classifier) > 2 and hasattr(model.classifier[2], 'in_features'):
-                        in_features = model.classifier[2].in_features
-                        model.classifier[2] = torch.nn.Linear(in_features, 2)
-                    else:
-                        model.classifier = torch.nn.Sequential(
-                            torch.nn.LayerNorm((768,), eps=1e-06, elementwise_affine=True),
-                            torch.nn.Flatten(start_dim=1, end_dim=-1),
-                            torch.nn.Linear(768, 2)
-                        )
+    else:
+        # Используем hf_hub_download для отдельного файла
+        try:
+            logging.info("hf_hub_download: repo=%s file=%s", repo_id, filename)
+            cached_path = hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                token=token,
+                local_dir=None,
+                local_dir_use_symlinks=False,
+                force_download=force_download,
+            )
+            cached_path = Path(cached_path)
+            if not cached_path.exists():
+                raise FileNotFoundError(f"hf_hub_download вернул несуществующий путь: {cached_path}")
 
-            # Сохраняем чекпойнт
-            torch.save({
-                'model_state_dict': model.state_dict(),
-                'model_name': model_name,
-                'num_classes': 2,
-                'trained': True,
-                'architecture': model_name,
-                'created_by': 'install_checkpoints.py'
-            }, checkpoint_path)
-
-            file_size = checkpoint_path.stat().st_size
-            print(f"✓ Успешно создан {model_name} -> {checkpoint_path} ({file_size} bytes)")
-            successful_creates += 1
+            # Копируем/перемещаем файл в целевую директорию
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(cached_path, target_path)
+            logging.debug("Скопирован %s -> %s", cached_path, target_path)
 
         except Exception as e:
-            print(f"✗ Ошибка при создании {model_name}: {e}")
-            # Создаем пустой файл как fallback
+            logging.exception("Ошибка при hf_hub_download: %s", e)
+            return False
+
+    # Небольшая проверка размера
+    try:
+        size = target_path.stat().st_size
+        if size < MIN_REASONABLE_SIZE:
+            logging.warning("Скачанный файл слишком мал (%d bytes): %s", size, target_path)
+            return False
+        logging.info("Файл загружен и проверен: %s (%d bytes)", target_path, size)
+        return True
+    except Exception as e:
+        logging.exception("Не удалось проверить файл %s: %s", target_path, e)
+        return False
+
+
+def install_model_checkpoints(
+    checkpoints_dir: str = "./checkpoints",
+    force: bool = False,
+    token: Optional[str] = None,
+    use_snapshot: bool = False,
+) -> Dict[str, Any]:
+    """Устанавливает чекпойнты по конфигу models_config().
+
+    Возвращает словарь-отчет с успехами/ошибками.
+    """
+    from ct_clf_hack.shared.config_utils import models_config
+
+    results = {
+        "successful": [],
+        "failed": [],
+        "skipped": [],
+    }
+
+    cfg = models_config()
+    logging.info("Загружено %d записей конфигурации модели", len(cfg))
+
+    base_dir = Path(checkpoints_dir)
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    for model_name, model_cfg in cfg.items():
+        local = model_cfg.get("local", "")
+        remote = model_cfg.get("remote", "")
+
+        if not local or not remote:
+            logging.warning("Пропускаем %s — неполная конфигурация", model_name)
+            results["skipped"].append((model_name, "incomplete config"))
+            continue
+
+        # Целевой путь
+        target_path = Path(local)
+        if not target_path.is_absolute():
+            target_path = base_dir.joinpath(Path(local).name) if Path(local).parent == Path(".") else Path(local)
+
+        # Если файл есть и не форсим — пропускаем
+        if target_path.exists() and not force:
+            size = target_path.stat().st_size
+            logging.info("Пропускаем %s — уже есть %s (%d bytes)", model_name, target_path, size)
+            results["skipped"].append((model_name, "exists", size))
+            continue
+
+        # Если форс — удаляем старый файл
+        if target_path.exists() and force:
             try:
-                checkpoint_path.touch()
-                print(f"  Создан пустой файл-заглушка: {checkpoint_path}")
+                target_path.unlink()
+                logging.info("Удален старый файл для %s: %s", model_name, target_path)
             except Exception:
-                pass
-            failed_creates += 1
+                logging.exception("Не удалось удалить старый файл %s", target_path)
 
-    print(f"\nРезультат установки моделей:")
-    print(f"Успешно создано: {successful_creates}")
-    print(f"Пропущено (уже существуют): {skipped}")
-    print(f"Ошибок: {failed_creates}")
+        # Имя файла (в репо ожидается именно такое имя)
+        filename = Path(local).name
 
-    # Проверяем финальное состояние
-    print(f"\nФинальная проверка директории {cache_path}:")
-    for model_name, _ in models_to_create:
-        checkpoint_path = cache_path / f'default_{model_name}.pth'
-        if checkpoint_path.exists():
-            size = checkpoint_path.stat().st_size
-            status = "✓ OK" if size > 100 else "⚠ Пустой"
-            print(f"  {model_name}: {status} ({size} bytes)")
+        ok = download_file_with_hf(
+            repo_id=remote,
+            filename=filename,
+            target_path=target_path,
+            token=token,
+            use_snapshot=use_snapshot,
+            force_download=force,
+        )
+
+        if ok:
+            results["successful"].append((model_name, str(target_path)))
         else:
-            print(f"  {model_name}: ✗ Отсутствует")
+            # как fallback — создадим пустой файл-заглушку, если это разрешено
+            try:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.touch()
+                logging.warning("Создан файл-заглушка: %s", target_path)
+            except Exception:
+                logging.exception("Не удалось создать заглушку %s", target_path)
+            results["failed"].append((model_name, str(target_path)))
+
+    # Итогный лог
+    logging.info("Успешно: %d, Пропущено: %d, Ошибок: %d",
+                 len(results["successful"]), len(results["skipped"]), len(results["failed"]))
+
+    return results
 
 
-def main():
-    """Основная функция."""
-    import argparse
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Install model checkpoints from Hugging Face Hub")
+    p.add_argument("--checkpoints-dir", type=str, default="./checkpoints", help="Directory where checkpoints are stored")
+    p.add_argument("--force", action="store_true", help="Overwrite existing checkpoints")
+    p.add_argument("--token", type=str, default=os.environ.get("HF_TOKEN") or os.environ.get("HF_HUB_TOKEN"), help="Hugging Face access token (or set HF_TOKEN env var)")
+    p.add_argument("--use-snapshot", action="store_true", help="Use snapshot_download (useful to mirror repo structure)")
+    p.add_argument("--verbose", action="store_true", help="Verbose logging")
+    return p.parse_args()
 
-    parser = argparse.ArgumentParser(description="Установка чекпойнтов моделей")
-    parser.add_argument(
-        "--checkpoints-dir",
-        type=str,
-        default="./checkpoints",
-        help="Директория для чекпойнтов моделей"
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Перезаписать существующие чекпойнты"
-    )
 
-    args = parser.parse_args()
+def main() -> None:
+    args = parse_args()
+    setup_logging(args.verbose)
 
-    # Если force=True, удаляем существующие файлы
-    if args.force:
-        checkpoints_path = Path(args.checkpoints_dir)
-        if checkpoints_path.exists():
-            for pth_file in checkpoints_path.glob("default_*.pth"):
-                try:
-                    pth_file.unlink()
-                    print(f"Удален существующий чекпойнт: {pth_file}")
-                except Exception as e:
-                    print(f"Не удалось удалить {pth_file}: {e}")
-
-    install_model_checkpoints(args.checkpoints_dir)
+    try:
+        report = install_model_checkpoints(
+            checkpoints_dir=args.checkpoints_dir,
+            force=args.force,
+            token=args.token,
+            use_snapshot=args.use_snapshot,
+        )
+        logging.info("Отчет: %s", report)
+    except Exception:
+        logging.exception("Неожиданная ошибка при установке чекпойнтов")
+        sys.exit(2)
 
 
 if __name__ == "__main__":
     main()
-
