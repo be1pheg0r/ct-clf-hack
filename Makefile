@@ -16,7 +16,7 @@ install-backend:
 	$(PYTHON) -m venv ./venv
 	. ./venv/bin/activate && pip install --upgrade pip
 	$(PYTHON) -m pip install poetry
-	poetry lock --no-update
+	poetry lock
 	poetry install
 	@echo "$(GREEN)Backend dependencies installed!$(NC)"
 

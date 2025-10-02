@@ -20,8 +20,8 @@ COPY pyproject.toml ./
 # Generate poetry.lock and install dependencies
 RUN poetry config virtualenvs.create true && \
     poetry config virtualenvs.in-project true && \
-    poetry lock --no-update && \
-    poetry install --no-dev --no-root
+    poetry lock && \
+    poetry install --only main --no-root
 
 # Stage 2: Frontend builder
 FROM node:18-slim AS frontend-builder
