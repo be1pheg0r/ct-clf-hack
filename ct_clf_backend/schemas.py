@@ -1,17 +1,21 @@
+"""
+Схемы для валидации входных и выходных данных API.
+"""
 from pydantic import BaseModel, Field
-
+from typing import List, Optional
 
 class InputData(BaseModel):
-    query_id: str = Field(..., description="Unique identifier for the query.")
-    session_id: str = Field(..., description="Session identifier.")
-    zip_file_path: str = Field(..., description="Path to the input zip file containing CT scan images.")
-    ts: str = Field(..., description="Timestamp.")
+    query_id: str = Field(..., description="Уникальный идентификатор запроса.")
+    session_id: str = Field(..., description="Идентификатор сессии.")
+    zip_file_path: str = Field(..., description="Путь к ZIP файлу с DICOM изображениями.")
+    ts: str = Field(..., description="Таймстамп запроса.")
 
 class OutputData(BaseModel):
-    path_to_study: str = Field(..., description="Path to the study.")
-    study_uid: str = Field(..., description="Study unique identifier.")
-    series_uid: str = Field(..., description="Series unique identifier.")
-    probability_of_pathology: float = Field(..., description="Probability of pathology (from 0.0 to 1.0).")
-    pathology: int = Field(..., description="Indicates if pathology is present (0 for no pathology, 1 for pathology).")
-    processing_status: str = Field(..., description="Processing status (Success/Failure).")
-    time_of_processing: float = Field(..., description="Time taken for processing (in seconds).")
+    path_to_study: str = Field(..., description="Путь к исследованию.")
+    study_uid: str = Field(..., description="Айди исследования.")
+    series_uid: str = Field(..., description="Серия исследования.")
+    probability_of_pathology: float = Field(..., description="Вероятность наличия патологии (от 0 до 1).")
+    pathology: int = Field(..., description="Метка патологии (0 - нет, 1 - есть).")
+    processing_status: str = Field(..., description="Статус обработки (например, 'success' или 'error').")
+    time_of_processing: float = Field(..., description="Время обработки в секундах.")
+    slices: Optional[List[str]] = None
