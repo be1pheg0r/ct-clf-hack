@@ -32,7 +32,8 @@ fastapi = ">=0.115.6"
 uvicorn = ">=0.34.0"
 python-multipart = "*"
 pydantic = "*"
-
+openpyxl= "*"
+huggingface-hub = "*"
 
 [tool.pytest.ini_options]
 markers = [

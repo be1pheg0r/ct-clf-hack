@@ -1,76 +1,51 @@
-# backend/app/model_connector.py
+"""
+Модуль для подключения к модели машинного обучения.
+Содержит функции для обработки DICOM файлов и взаимодействия с моделью классификации.
+"""
+
+import sys
 import time
-from typing import List, Tuple, Dict, Any
-from io import BytesIO
-import pydicom
+from pathlib import Path
+from typing import Any, Dict, List
+
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+from ct_clf_backend.app.cache_utils import (cleanup_cache,
+                                            extract_dicom_metadata,
+                                            process_uploaded_file)
+from ct_clf_hack.pipelines import base_process
+from ct_clf_hack.shared.data_utils import (prepare_images_for_model,
+                                           process_uploaded_dicom_zip)
 
 
-def ConnectingLinkWithModel(dicom_files: List[Tuple[str, bytes]]) -> Dict[str, Any]:
+def ConnectingLinkWithModel(dicom_file_paths: List[Path]) -> Dict[str, Any]:
     """
-    Заглушка "связки с моделью", улучшенная.
-    Принимает список кортежей (filename, raw_bytes) — это все кандидаты DICOM файлов.
-    Возвращает словарь с ключами:
-      - path_to_study: str ("uploaded_zip", "single_dicom", or filename-based)
-      - study_uid: str
-      - series_uid: str
-      - probability_of_pathology: float
-      - pathology: int (0 or 1)
-      - model_processing_time: float (секунды)
-    Реализация:
-      - парсит заголовки DICOM (если pydicom доступен) и извлекает первые ненулевые Study/Series UID
-      - path_to_study: "uploaded_zip" если >1 файл, "single_dicom" если ровно 1, "unknown" иначе
-      - модель: простая детерминированная функция от числа файлов (можно заменить на реальную интеграцию)
-      - симулирует небольшую задержку
+    Обрабатывает список DICOM файлов с помощью модели.
+
+    Args:
+        dicom_file_paths: Список путей к DICOM файлам
+
+    Returns:
+        Dict[str, Any]: Результаты анализа модели
     """
     t0 = time.time()
 
-    study_uid = ""
-    series_uid = ""
-
-    n = len(dicom_files)
-
-    # determine path_to_study
-    if n == 0:
-        path_to_study = "unknown"
-    elif n == 1:
+    if len(dicom_file_paths) == 0:
+        path_to_study = "no_files"
+    elif len(dicom_file_paths) == 1:
         path_to_study = "single_dicom"
     else:
-        # if all files came from a zip, keep generic uploaded_zip
-        path_to_study = "uploaded_zip"
+        path_to_study = "zip_archive"
 
-    # Try to parse headers (first non-empty Study/Series UID)
-    if pydicom is not None and n > 0:
-        for filename, raw in dicom_files:
-            try:
-                ds = pydicom.dcmread(BytesIO(raw), stop_before_pixels=True, force=True)
-                if not study_uid and hasattr(ds, "StudyInstanceUID"):
-                    try:
-                        study_uid = str(ds.StudyInstanceUID)
-                    except Exception:
-                        study_uid = ""
-                if not series_uid and hasattr(ds, "SeriesInstanceUID"):
-                    try:
-                        series_uid = str(ds.SeriesInstanceUID)
-                    except Exception:
-                        series_uid = ""
-                # break early if both found
-                if study_uid and series_uid:
-                    break
-            except Exception:
-                # skip unreadable files
-                continue
+    study_uid, series_uid = extract_dicom_metadata(dicom_file_paths)
 
-    # Simple deterministic "model" inference based on n
-    if n == 0:
+    if len(dicom_file_paths) > 0:
+        results = base_process(dpath=Path(dicom_file_paths[0]).parent)
+        probability = results.get("probability_of_pathology", 0.0)
+        pathology = results.get("pathology", 0)
+    else:
         probability = 0.0
         pathology = 0
-    else:
-        probability = min(0.05 + 0.02 * n, 0.95)
-        pathology = 1 if probability > 0.5 else 0
-
-    # simulate model processing time (bounded)
-    simulated_sleep = 0.12 * min(n, 12)
-    time.sleep(simulated_sleep)
 
     model_processing_time = round(time.time() - t0, 3)
 
@@ -82,3 +57,77 @@ def ConnectingLinkWithModel(dicom_files: List[Tuple[str, bytes]]) -> Dict[str, A
         "pathology": int(pathology),
         "model_processing_time": float(model_processing_time),
     }
+
+
+def ConnectingLinkWithModelFromZip(zip_bytes: bytes, max_slices: int = 10) -> Dict[str, Any]:
+    """
+    Обрабатывает ZIP архив с DICOM файлами с помощью модели.
+
+    Args:
+        zip_bytes: Байты ZIP архива
+        max_slices: Максимальное количество срезов для обработки
+
+    Returns:
+        Dict[str, Any]: Результаты анализа модели
+    """
+    t0 = time.time()
+
+    try:
+        study_uid = "unknown"
+        series_uid = "unknown"
+
+        try:
+            selected_dicom_files, temp_cache_dir = process_uploaded_file(zip_bytes, max_files=10)
+            if selected_dicom_files:
+                study_uid_temp, series_uid_temp = extract_dicom_metadata(selected_dicom_files)
+                if study_uid_temp:
+                    study_uid = study_uid_temp
+                if series_uid_temp:
+                    series_uid = series_uid_temp
+            cleanup_cache(temp_cache_dir)
+        except Exception:
+            pass
+
+        images, status = process_uploaded_dicom_zip(zip_bytes, max_slices)
+
+        if not images:
+            return {
+                "path_to_study": "zip_archive",
+                "study_uid": study_uid,
+                "series_uid": series_uid,
+                "probability_of_pathology": 0.0,
+                "pathology": 0,
+                "model_processing_time": round(time.time() - t0, 3),
+                "error": status
+            }
+
+        rgb_images = prepare_images_for_model(images)
+
+        result = base_process(images=rgb_images)
+        probability = result.get("probability_of_pathology", 0.0)
+        pathology = result.get("pathology", 0)
+        path_to_study = result.get("path_to_study", "zip_archive")
+
+        model_processing_time = round(time.time() - t0, 3)
+
+        return {
+            "path_to_study": path_to_study,
+            "study_uid": study_uid,
+            "series_uid": series_uid,
+            "probability_of_pathology": float(probability),
+            "pathology": int(pathology),
+            "model_processing_time": float(model_processing_time),
+            "processed_slices": len(images),
+            "status": status
+        }
+
+    except Exception as e:
+        return {
+            "path_to_study": "zip_archive",
+            "study_uid": "unknown",
+            "series_uid": "unknown",
+            "probability_of_pathology": 0.0,
+            "pathology": 0,
+            "model_processing_time": round(time.time() - t0, 3),
+            "error": f"Processing error: {str(e)}"
+        }
