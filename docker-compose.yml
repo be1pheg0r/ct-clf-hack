@@ -1,0 +1,68 @@
+services:
+  # Backend service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    container_name: ct-clf-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./checkpoints:/app/checkpoints
+      - ./configs:/app/configs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Frontend service
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+    container_name: ct-clf-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Full application service (alternative to separate backend/frontend)
+  fullstack:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: fullstack
+    container_name: ct-clf-fullstack
+    ports:
+      - "80:80"
+      - "8001:8000"
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./checkpoints:/app/checkpoints
+      - ./configs:/app/configs
+    restart: unless-stopped
+    profiles:
+      - fullstack
+
+networks:
+  default:
+    driver: bridge

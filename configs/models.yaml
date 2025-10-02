@@ -1,0 +1,12 @@
+Inception_V3:
+  local: "checkpoints/default_Inception_V3.pth"
+  remote: "be1pheg0r/ct_clf_models"
+ResNet50:
+  local: "checkpoints/default_ResNet50.pth"
+  remote: "be1pheg0r/ct_clf_models"
+DenseNet121:
+  local: "checkpoints/default_DenseNet121.pth"
+  remote: "be1pheg0r/ct_clf_models"
+ConvNeXt_Tiny:
+  local: "checkpoints/default_ConvNeXt_Tiny.pth"
+  remote: "be1pheg0r/ct_clf_models"
