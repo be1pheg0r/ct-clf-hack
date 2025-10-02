@@ -44,68 +44,8 @@ RUN mkdir -p /app/checkpoints && \
     export HF_HOME="/app/checkpoints" && \
     export TRANSFORMERS_CACHE="/app/checkpoints" && \
     export PYTHONPATH="/app" && \
-    python scripts/download_models.py --cache-dir /app/checkpoints || echo "HF model download failed" && \
-    echo "Training model checkpoints..." && \
-    python -c "
-import torch
-import torchvision.models as models
-import os
-from pathlib import Path
-
-# Create dummy trained models
-models_to_create = [
-    ('Inception_V3', models.inception_v3),
-    ('ResNet50', models.resnet50),
-    ('DenseNet121', models.densenet121),
-    ('ConvNeXt_Tiny', models.convnext_tiny)
-]
-
-checkpoints_dir = Path('/app/checkpoints')
-checkpoints_dir.mkdir(exist_ok=True)
-
-for model_name, model_func in models_to_create:
-    try:
-        print(f'Creating checkpoint for {model_name}...')
-        model = model_func(weights='DEFAULT')
-
-        # Modify final layer for binary classification
-        if 'ResNet' in model_name or 'DenseNet' in model_name:
-            if hasattr(model, 'classifier'):
-                in_features = model.classifier.in_features
-                model.classifier = torch.nn.Linear(in_features, 2)
-            elif hasattr(model, 'fc'):
-                in_features = model.fc.in_features
-                model.fc = torch.nn.Linear(in_features, 2)
-        elif 'Inception' in model_name:
-            if hasattr(model, 'fc'):
-                in_features = model.fc.in_features
-                model.fc = torch.nn.Linear(in_features, 2)
-        elif 'ConvNeXt' in model_name:
-            if hasattr(model, 'classifier'):
-                model.classifier = torch.nn.Sequential(
-                    torch.nn.LayerNorm((768,), eps=1e-06, elementwise_affine=True),
-                    torch.nn.Flatten(start_dim=1, end_dim=-1),
-                    torch.nn.Linear(768, 2)
-                )
-
-        checkpoint_path = checkpoints_dir / f'default_{model_name}.pth'
-        torch.save({
-            'model_state_dict': model.state_dict(),
-            'model_name': model_name,
-            'num_classes': 2,
-            'trained': True
-        }, checkpoint_path)
-        print(f'✓ Created checkpoint: {checkpoint_path}')
-
-    except Exception as e:
-        print(f'✗ Failed to create {model_name}: {e}')
-        # Create empty file as fallback
-        (checkpoints_dir / f'default_{model_name}.pth').touch()
-" || echo "Model creation failed, using placeholders" && \
-    touch /app/checkpoints/default_Inception_V3.pth && \
-    touch /app/checkpoints/default_ResNet50.pth && \
-    touch /app/checkpoints/default_DenseNet121.pth && \
-    touch /app/checkpoints/default_ConvNeXt_Tiny.pth
+    python scripts/download_models.py --cache-dir /app/checkpoints --create-checkpoints || echo "Model creation failed" && \
+    ls -la /app/checkpoints/
 
 # Stage 2: Frontend builder
 FROM node:18-slim AS frontend-builder

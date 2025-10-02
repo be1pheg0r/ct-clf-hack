@@ -42,11 +42,9 @@ def download_models(cache_dir: str = "./checkpoints") -> None:
         print("Установите: pip install transformers huggingface_hub")
         return
 
-    # Создаем д��ректорию для моделей
     cache_path = Path(cache_dir)
     cache_path.mkdir(exist_ok=True)
 
-    # Устанавливаем переменную окружения для Huggingface
     os.environ['HF_HOME'] = str(cache_path)
     os.environ['TRANSFORMERS_CACHE'] = str(cache_path)
 
