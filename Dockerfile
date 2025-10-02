@@ -26,13 +26,12 @@ RUN apt-get update && apt-get install -y \
 RUN pip install poetry
 
 # Copy backend dependency files
-COPY pyproject.toml ./
+COPY pyproject.toml poetry.lock* ./
 
-# Generate poetry.lock and install dependencies
+# Generate poetry.lock and install dependencies including the project itself
 RUN poetry config virtualenvs.create true && \
     poetry config virtualenvs.in-project true && \
-    poetry lock && \
-    poetry install --only main --no-root
+    poetry install --only main
 
 # Copy scripts and configs needed for model installation
 COPY scripts/ ./scripts/
@@ -43,7 +42,6 @@ ENV PYTHONPATH="/app"
 
 # Install model checkpoints using the dedicated script (with Poetry env)
 RUN mkdir -p /app/checkpoints && \
-    export PYTHONPATH && \
     poetry run python scripts/install_checkpoints.py --checkpoints-dir /app/checkpoints
 
 # Stage 2: Frontend builder
