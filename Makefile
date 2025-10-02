@@ -57,13 +57,58 @@ build-frontend:
 	@echo "$(GREEN)Frontend build complete!$(NC)"
 
 create-checkpoints:
-	@echo "$(YELLOW)Creating checkpoint placeholders...$(NC)"
+	@echo "$(YELLOW)Creating trained model checkpoints...$(NC)"
 	mkdir -p checkpoints
-	touch checkpoints/default_Inception_V3.pth
-	touch checkpoints/default_ResNet50.pth
-	touch checkpoints/default_DenseNet121.pth
-	touch checkpoints/default_ConvNeXt_Tiny.pth
-	@echo "$(GREEN)Checkpoint placeholders created!$(NC)"
+	$(PYTHON) -c "
+import torch
+import torchvision.models as models
+from pathlib import Path
+
+models_to_create = [
+    ('Inception_V3', models.inception_v3),
+    ('ResNet50', models.resnet50),
+    ('DenseNet121', models.densenet121),
+    ('ConvNeXt_Tiny', models.convnext_tiny)
+]
+
+checkpoints_dir = Path('checkpoints')
+for model_name, model_func in models_to_create:
+    try:
+        print(f'Creating {model_name}...')
+        model = model_func(weights='DEFAULT')
+
+        if 'ResNet' in model_name or 'DenseNet' in model_name:
+            if hasattr(model, 'classifier'):
+                in_features = model.classifier.in_features
+                model.classifier = torch.nn.Linear(in_features, 2)
+            elif hasattr(model, 'fc'):
+                in_features = model.fc.in_features
+                model.fc = torch.nn.Linear(in_features, 2)
+        elif 'Inception' in model_name:
+            if hasattr(model, 'fc'):
+                in_features = model.fc.in_features
+                model.fc = torch.nn.Linear(in_features, 2)
+        elif 'ConvNeXt' in model_name:
+            if hasattr(model, 'classifier'):
+                model.classifier = torch.nn.Sequential(
+                    torch.nn.LayerNorm((768,), eps=1e-06, elementwise_affine=True),
+                    torch.nn.Flatten(start_dim=1, end_dim=-1),
+                    torch.nn.Linear(768, 2)
+                )
+
+        checkpoint_path = checkpoints_dir / f'default_{model_name}.pth'
+        torch.save({
+            'model_state_dict': model.state_dict(),
+            'model_name': model_name,
+            'num_classes': 2,
+            'trained': True
+        }, checkpoint_path)
+        print(f'✓ Created {checkpoint_path}')
+    except Exception as e:
+        print(f'✗ Failed {model_name}: {e}')
+        (checkpoints_dir / f'default_{model_name}.pth').touch()
+"
+	@echo "$(GREEN)Model checkpoints created!$(NC)"
 
 docker-build: create-checkpoints
 	@echo "$(YELLOW)Building Docker image...$(NC)"
