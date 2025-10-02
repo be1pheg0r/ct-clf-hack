@@ -5,7 +5,7 @@ FROM python:3.11-slim AS backend-builder
 
 WORKDIR /app
 
-# Install system dependencies for backend (OpenCV headless compatible)
+# Install system dependencies for backend
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
@@ -34,86 +34,15 @@ RUN poetry config virtualenvs.create true && \
     poetry lock && \
     poetry install --only main --no-root
 
-# Copy model training scripts and configs
+# Copy scripts and configs needed for model installation
 COPY scripts/ ./scripts/
 COPY configs/ ./configs/
 COPY ct_clf_hack/ ./ct_clf_hack/
 
-# Copy existing checkpoints if available, then create missing ones
-COPY checkpoints/ /app/checkpoints/ 2>/dev/null || true
+# Install model checkpoints using the dedicated script
 RUN mkdir -p /app/checkpoints && \
-    export HF_HOME="/app/checkpoints" && \
-    export TRANSFORMERS_CACHE="/app/checkpoints" && \
     export PYTHONPATH="/app" && \
-    echo "Creating missing model checkpoints..." && \
-    python -c "
-import torch
-import torchvision.models as models
-from pathlib import Path
-import os
-
-checkpoints_dir = Path('/app/checkpoints')
-checkpoints_dir.mkdir(exist_ok=True)
-
-models_to_create = [
-    ('Inception_V3', models.inception_v3),
-    ('ResNet50', models.resnet50),
-    ('DenseNet121', models.densenet121),
-    ('ConvNeXt_Tiny', models.convnext_tiny)
-]
-
-for model_name, model_func in models_to_create:
-    checkpoint_path = checkpoints_dir / f'default_{model_name}.pth'
-    if checkpoint_path.exists() and checkpoint_path.stat().st_size > 100:
-        print(f'✓ Checkpoint {model_name} already exists')
-        continue
-
-    try:
-        print(f'Creating checkpoint for {model_name}...')
-        model = model_func(weights='DEFAULT')
-
-        # Modify final layer for binary classification
-        if 'ResNet' in model_name or 'DenseNet' in model_name:
-            if hasattr(model, 'classifier'):
-                in_features = model.classifier.in_features
-                model.classifier = torch.nn.Linear(in_features, 2)
-            elif hasattr(model, 'fc'):
-                in_features = model.fc.in_features
-                model.fc = torch.nn.Linear(in_features, 2)
-        elif 'Inception' in model_name:
-            if hasattr(model, 'fc'):
-                in_features = model.fc.in_features
-                model.fc = torch.nn.Linear(in_features, 2)
-            if hasattr(model, 'AuxLogits') and hasattr(model.AuxLogits, 'fc'):
-                in_features = model.AuxLogits.fc.in_features
-                model.AuxLogits.fc = torch.nn.Linear(in_features, 2)
-        elif 'ConvNeXt' in model_name:
-            if hasattr(model, 'classifier'):
-                if len(model.classifier) > 2:
-                    in_features = model.classifier[2].in_features
-                    model.classifier[2] = torch.nn.Linear(in_features, 2)
-                else:
-                    model.classifier = torch.nn.Sequential(
-                        torch.nn.LayerNorm((768,), eps=1e-06, elementwise_affine=True),
-                        torch.nn.Flatten(start_dim=1, end_dim=-1),
-                        torch.nn.Linear(768, 2)
-                    )
-
-        torch.save({
-            'model_state_dict': model.state_dict(),
-            'model_name': model_name,
-            'num_classes': 2,
-            'trained': True,
-            'architecture': model_name
-        }, checkpoint_path)
-        print(f'✓ Created checkpoint: {checkpoint_path} ({checkpoint_path.stat().st_size} bytes)')
-
-    except Exception as e:
-        print(f'✗ Failed to create {model_name}: {e}')
-        checkpoint_path.touch()
-" && \
-    ls -la /app/checkpoints/ && \
-    echo "Checkpoint creation completed"
+    python scripts/install_checkpoints.py --checkpoints-dir /app/checkpoints
 
 # Stage 2: Frontend builder
 FROM node:18-slim AS frontend-builder
@@ -140,7 +69,7 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
 
-# Install system runtime dependencies (OpenCV headless compatible)
+# Install system runtime dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     git \
@@ -156,10 +85,8 @@ RUN apt-get update && apt-get install -y \
     libavformat-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend virtual environment from builder
+# Copy backend virtual environment and models from builder
 COPY --from=backend-builder --chown=appuser:appuser /app/.venv /app/.venv
-
-# Copy downloaded models from builder
 COPY --from=backend-builder --chown=appuser:appuser /app/checkpoints /app/checkpoints
 
 ENV PATH="/app/.venv/bin:$PATH"
@@ -169,21 +96,13 @@ COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
 COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
 COPY --chown=appuser:appuser configs ./configs
 
-# Create project marker files for path detection
+# Create project marker files
 RUN touch /app/pyproject.toml /app/.project_root && \
     chown appuser:appuser /app/pyproject.toml /app/.project_root
 
-# Create checkpoints directory and placeholder files
-RUN mkdir -p /app/checkpoints && \
-    touch /app/checkpoints/default_Inception_V3.pth && \
-    touch /app/checkpoints/default_ResNet50.pth && \
-    touch /app/checkpoints/default_DenseNet121.pth && \
-    touch /app/checkpoints/default_ConvNeXt_Tiny.pth && \
-    chown -R appuser:appuser /app/checkpoints
-
 # Create necessary directories
 RUN mkdir -p /app/data /app/logs /app/cache && \
-    chown -R appuser:appuser /app/data /app/logs /app/cache
+    chown -R appuser:appuser /app/data /app/logs /app/cache /app/checkpoints
 
 USER appuser
 
@@ -192,7 +111,6 @@ ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     OPENCV_IO_ENABLE_OPENEXR=1 \
     QT_QPA_PLATFORM=offscreen \
-    DEBIAN_FRONTEND=noninteractive \
     PROJECT_ROOT=/app
 
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
@@ -218,7 +136,7 @@ CMD ["nginx", "-g", "daemon off;"]
 # Stage 5: Full application (both backend and frontend)
 FROM python:3.11-slim AS fullstack
 
-# Install system dependencies (OpenCV headless compatible)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     nginx \
@@ -241,31 +159,23 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
 
-# Copy backend from backend stage
+# Copy backend from backend stage (already includes models)
 COPY --from=backend-builder --chown=appuser:appuser /app/.venv /app/.venv
 COPY --from=backend-builder --chown=appuser:appuser /app/checkpoints /app/checkpoints
 COPY --chown=appuser:appuser ct_clf_backend ./ct_clf_backend
 COPY --chown=appuser:appuser ct_clf_hack ./ct_clf_hack
 COPY --chown=appuser:appuser configs ./configs
 
-# Create project marker files for path detection
+# Create project marker files
 RUN touch /app/pyproject.toml /app/.project_root && \
     chown appuser:appuser /app/pyproject.toml /app/.project_root
-
-# Create checkpoints directory and placeholder files
-RUN mkdir -p /app/checkpoints && \
-    touch /app/checkpoints/default_Inception_V3.pth && \
-    touch /app/checkpoints/default_ResNet50.pth && \
-    touch /app/checkpoints/default_DenseNet121.pth && \
-    touch /app/checkpoints/default_ConvNeXt_Tiny.pth && \
-    chown -R appuser:appuser /app/checkpoints
 
 # Copy built frontend from frontend builder
 COPY --from=frontend-builder /app/frontend/build /usr/share/nginx/html
 
 # Create necessary directories
 RUN mkdir -p /app/data /app/logs /app/cache && \
-    chown -R appuser:appuser /app/data /app/logs /app/cache
+    chown -R appuser:appuser /app/data /app/logs /app/cache /app/checkpoints
 
 # Copy supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -277,7 +187,6 @@ ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     OPENCV_IO_ENABLE_OPENEXR=1 \
     QT_QPA_PLATFORM=offscreen \
-    DEBIAN_FRONTEND=noninteractive \
     PROJECT_ROOT=/app
 
 EXPOSE 80 8000
